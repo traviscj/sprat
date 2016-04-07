@@ -3,8 +3,7 @@
 {%- endmacro %}
 <html>
 <head>
-    <link rel="icon" 
-          href="/static/sprat_favicon.ico">
+    <link rel="icon" href="/static/sprat_favicon.ico">
     
 </head>
 <body>
@@ -26,7 +25,7 @@
 <h1>sprat deck</h1>
     {% if sprat_top %}
         <!-- replace this with a url_for -->
-        <a href="/sprat_to_ace/{{player}}">
+        <a href="/{{ game_token }}/sprat_to_ace/{{player}}">
             {{ card_img(sprat_top) }}
         </a>
     {% else %}
@@ -40,13 +39,13 @@
             {% if pile.cards[:-1] %}
                 {% for card_index in range(pile.cards[:-1]|count) %}
                 {% set card = pile.cards[:-1][card_index] %}
-                    <a href="/stack_to_ace/{{player}}/{{pile_index}}/{{card_index}}">
+                    <a href="/{{ game_token }}/stack_to_ace/{{player}}/{{pile_index}}/{{card_index}}">
                         {{ card_img(card) }}
                     </a>
                 {% endfor %}
             {% endif %}
             {% if pile.cards[-1] %}
-                <a href="/pile_to_ace/{{player}}/{{pile_index}}">
+                <a href="/{{ game_token }}/pile_to_ace/{{player}}/{{pile_index}}">
                     {{ card_img(pile.cards[-1]) }}
                 </a>
             {% endif %}
@@ -55,9 +54,9 @@
     </ul>
 <h1>
     {% if flip_deck.in_hand %}
-    <a href="/flip/{{player}}">flip</a>
+    <a href="/{{ game_token }}/flip/{{player}}">flip</a>
     {% else %}
-    <a href="/flip/{{player}}">recycle</a>
+    <a href="/{{ game_token }}/flip/{{player}}">recycle</a>
     {% endif %}
 </h1>
     
@@ -66,7 +65,7 @@
      {% for flip_card in flip_deck.on_table[:-1] %}
          {{ card_img(flip_card) }}
      {% endfor %}
-     <a href="/flip_to_ace/{{player}}">
+     <a href="/{{ game_token }}/flip_to_ace/{{player}}">
          {{ card_img(flip_deck.on_table[-1]) }}
      </a>
      

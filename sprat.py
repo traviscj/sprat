@@ -1,5 +1,8 @@
 import json
 import random
+from random import choice
+from string import ascii_uppercase
+
 
 use_random = True
 
@@ -214,26 +217,52 @@ class SpratGameState(object):
         return {player:self.player_states[player].sprat_deck.count() for player in self.players}
             
 
-from flask import Flask, url_for, render_template, flash, redirect
+from flask import Flask, url_for, render_template, flash, redirect, jsonify
 app = Flask(__name__)
 app.secret_key = 'some_secret'
 
-players = ["traviscj", "anjorges", "dawnannj", "dpiet", "pjoos"]
+player_map = {}
+sgs_map = {}
 
-sgs = SpratGameState(players)
+def get_token():
+    return(''.join(choice(ascii_uppercase) for i in range(4)))
 
-@app.route('/sprat_to_ace/<player>')
-def sprat_to_ace(player):
+@app.route("/new_game")
+def new_game():
+    new_token = get_token()
+    player_map[new_token] = []
+    return new_token
+@app.route("/add_player/<game_token>/<player>")
+def add_player(game_token, player):
+    player_map[game_token].append(player)
+    return "added {} to game {}".format(player, game_token)
+
+@app.route("/start_game/<game_token>")
+def start_game(game_token):
+    sgs_map[game_token] = SpratGameState(player_map[game_token])
+    return "GO FOR LAUNCH!"
+
+@app.route("/game_states")
+def game_states():
+    return jsonify({
+        "player_map": player_map,
+        "sgs_map": sgs_map.keys(),
+    })
+
+@app.route('/<game_token>/sprat_to_ace/<player>')
+def sprat_to_ace(game_token, player):
+    sgs = sgs_map[game_token]
     player_state = sgs.player_states[player]
     res = player_state.sprat_deck.get()
     result = sgs.to_ace_piles(res)
     if result == COULD_NOT_MOVE:
         player_state.sprat_deck.un_get(res)
     flash(result)
-    return redirect(url_for('html_sgs', player=player))
+    return redirect(url_for('html_sgs', game_token=game_token, player=player))
 
-@app.route('/pile_to_ace/<player>/<int:pile>')
-def pile_to_ace(player, pile):
+@app.route('/<game_token>/pile_to_ace/<player>/<int:pile>')
+def pile_to_ace(game_token, player, pile):
+    sgs = sgs_map[game_token]
     player_state = sgs.player_states[player]
     print player_state.piles[pile].cards
     res = player_state.piles[pile].cards.pop()
@@ -241,10 +270,11 @@ def pile_to_ace(player, pile):
     if result == COULD_NOT_MOVE:
         player_state.piles[pile].cards.append(res)
     flash(result)
-    return redirect(url_for('html_sgs', player=player))
+    return redirect(url_for('html_sgs', game_token=game_token, player=player))
 
-@app.route('/stack_to_ace/<player>/<int:pile>/<int:pile_index>')
-def stack_to_ace(player, pile, pile_index):
+@app.route('/<game_token>/stack_to_ace/<player>/<int:pile>/<int:pile_index>')
+def stack_to_ace(game_token, player, pile, pile_index):
+    sgs = sgs_map[game_token]
     player_state = sgs.player_states[player]
     stack = player_state.piles[pile].cards[pile_index:]
     player_state.piles[pile].cards[pile_index:] = []
@@ -258,28 +288,31 @@ def stack_to_ace(player, pile, pile_index):
             res = stack.pop(0)
             sgs.to_ace_piles(res)
     flash(result)
-    return redirect(url_for('html_sgs', player=player))
+    return redirect(url_for('html_sgs', game_token=game_token, player=player))
     
 
-@app.route('/flip_to_ace/<player>')
-def flip_to_ace(player):
+@app.route('/<game_token>/flip_to_ace/<player>')
+def flip_to_ace(game_token, player):
+    sgs = sgs_map[game_token]
     player_state = sgs.player_states[player]
     res = player_state.flip_deck.get()
     result = sgs.to_ace_piles(res)
     if result == COULD_NOT_MOVE:
         player_state.flip_deck.on_table.append(res)
     flash(result)
-    return redirect(url_for('html_sgs', player=player))
+    return redirect(url_for('html_sgs', game_token=game_token, player=player))
 
-@app.route("/flip/<player>")
-def flip(player):
+@app.route("/<game_token>/flip/<player>")
+def flip(game_token, player):
+    sgs = sgs_map[game_token]
     cur_player = sgs.player_states[player]
     cur_player.flip_deck.flip()
     flash("flipped flip deck")
-    return redirect(url_for('html_sgs', player=player))
+    return redirect(url_for('html_sgs', game_token=game_token, player=player))
 
-@app.route('/<player>')
-def html_sgs(player):
+@app.route('/<game_token>/<player>')
+def html_sgs(game_token, player):
+    sgs = sgs_map[game_token]
     winners = any(player for player, state in sgs.player_states.items() if state.sprat_deck.top_card is None)
     if winners:
         flash("game is over!, won by {}".format(winners))
@@ -292,6 +325,7 @@ def html_sgs(player):
         flip_deck=cur_player.flip_deck,
         round_stats=sgs.count_scores(),
         sprat_stats=sgs.count_sprats(),
+        game_token=game_token,
     )
 
 if __name__ == '__main__':
