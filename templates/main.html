@@ -17,6 +17,7 @@
       {% endif %}
     {% endwith %}
 
+{% if not winners %}
 <h1>ace piles</h1>
     {% for ace_pile in ace_piles %}
         {{ card_img(ace_pile) }}
@@ -72,6 +73,7 @@
     {% else %}
     no flip deck??
     {% endif %}
+{% endif %}
 <h1>round stats</h1>
 <ul>
 {% for user, score in round_stats.items() %}
@@ -113,6 +115,10 @@ Negative scores are possible but should be avoided as the goal is to get a high 
     <li>It's tempting to try to prevent other players from playing on "your cards" by focusing on the piles instead of the ace piles, but your only source of points is exactly the cards you get on the ace piles, so resist that temptation.</li>
 </ul>
 
+<h1>bugs</h1>
+<ul>
+    <li>can click a card in the middle of a pile, it will move without moving the cards that bury it</li>
+</ul>
 <h1>todo</h1>
 <ul>
     <li>implement flip deck view</li>

@@ -184,7 +184,8 @@ class SpratGameState(object):
                 print " -", self.ace_piles[suit][player]
         for player in self.players:
             self.player_states[player].show()
-        
+    def get_ace_piles(self):
+        return [self.ace_piles[suit][player].cards[-1] for suit in SUITS for player in self.players if len(self.ace_piles[suit][player].cards) > 0]
     def to_ace_piles(self, card):
         for suit in SUITS:
             for player in self.players:
@@ -315,13 +316,14 @@ def flip(game_token, player):
 @app.route('/<game_token>/<player>')
 def html_sgs(game_token, player):
     sgs = sgs_map[game_token]
-    winners = any(player for player, state in sgs.player_states.items() if state.sprat_deck.top_card is None)
-    if winners:
+    winners = [player for player, state in sgs.player_states.items() if state.sprat_deck.top_card is None]
+    if len(winners) > 0:
         flash("game is over!, won by {}".format(winners))
     cur_player = sgs.player_states[player]
     return render_template('main.html', 
+        winners=winners,
         player=player,
-        ace_piles=[sgs.ace_piles[suit][player].cards[-1] for suit in SUITS for player in sgs.players if len(sgs.ace_piles[suit][player].cards) > 0],
+        ace_piles=sgs.get_ace_piles(),
         sprat_top=cur_player.sprat_deck.top_card,
         piles=cur_player.piles,
         flip_deck=cur_player.flip_deck,
