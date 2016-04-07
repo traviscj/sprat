@@ -1,0 +1,132 @@
+{% macro card_img(card) -%}
+    <img src="{{ url_for('static', filename=card.asset()) }}" width=75 border="1" />
+{%- endmacro %}
+<html>
+<head>
+    <link rel="icon" 
+          href="/static/sprat_favicon.ico">
+    
+</head>
+<body>
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <ul class=flashes>
+        {% for message in messages %}
+          <li>{{ message }}</li>
+        {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+<h1>ace piles</h1>
+    {% for ace_pile in ace_piles %}
+        {{ card_img(ace_pile) }}
+    {% endfor %}
+
+<h1>sprat deck</h1>
+    {% if sprat_top %}
+        <!-- replace this with a url_for -->
+        <a href="/sprat_to_ace/{{player}}">
+            {{ card_img(sprat_top) }}
+        </a>
+    {% else %}
+        You Won!
+    {% endif %}
+<h1>piles</h1>
+    <ul>
+    {% for pile_index, pile in piles.items() %}
+        <li>
+            {{ pile_index }}
+            {% if pile.cards[:-1] %}
+                {% for card_index in range(pile.cards[:-1]|count) %}
+                {% set card = pile.cards[:-1][card_index] %}
+                    <a href="/stack_to_ace/{{player}}/{{pile_index}}/{{card_index}}">
+                        {{ card_img(card) }}
+                    </a>
+                {% endfor %}
+            {% endif %}
+            {% if pile.cards[-1] %}
+                <a href="/pile_to_ace/{{player}}/{{pile_index}}">
+                    {{ card_img(pile.cards[-1]) }}
+                </a>
+            {% endif %}
+        </li>
+    {% endfor %}
+    </ul>
+<h1>
+    {% if flip_deck.in_hand %}
+    <a href="/flip/{{player}}">flip</a>
+    {% else %}
+    <a href="/flip/{{player}}">recycle</a>
+    {% endif %}
+</h1>
+    
+    
+    {% if flip_deck.on_table %}
+     {% for flip_card in flip_deck.on_table[:-1] %}
+         {{ card_img(flip_card) }}
+     {% endfor %}
+     <a href="/flip_to_ace/{{player}}">
+         {{ card_img(flip_deck.on_table[-1]) }}
+     </a>
+     
+    {% else %}
+    no flip deck??
+    {% endif %}
+<h1>round stats</h1>
+<ul>
+{% for user, score in round_stats.items() %}
+<li>{{user}}: {{score}}</li>
+{% endfor %}
+{% for user, score in sprat_stats.items() %}
+<li>{{user}}: {{score}}</li>
+{% endfor %}
+</ul>
+
+<h1>rules</h1>
+<p>Sprat is similar to Solitaire, but the "win" conditions are a bit different: 
+The goal of the game is to get rid of your sprat deck -- there are 13 cards, and you only see the top one.
+
+<p>The ace piles almost work like in Solitaire: 
+You play cards that match suit in increasing order. 
+The difference is that the ace piles are shared between all players!
+If any player movesΩ an Ace of Hearts to the ace piles, you can play your two of hearts on top of it.
+If two players have a two of hearts, both can play but only one can win, so the game is meant to be fast paced!
+
+<p>The piles section is a "staging area" where only you can play.
+You can place cards (e.g. from the sprat deck or flip deck) in descending order and alternating suit-color.
+So you can play a black ten on a red Jack.
+You can also move the entire pile or a sub-pile to another pile.
+So if you you have a pile with a red Jack and black ten, you can move both cards to a black Queen.
+(To do this in the game, click the red Jack.)
+
+<p>Cards from the top of the flip deck can be played anywhere, or you can flip the next three cards over.
+You can see the history, but can only play the topmost card (rightmost in the current implementation).
+This is to tantalize you with the cards you can almost play, but can't.
+
+<p>Scoring works as follows:
+When any player gets a "sprat!" (they have exhausted their sprat deck), the score of each player for that round is the number of cards they have played on the ace piles minus twice the number of cards left in their sprat deck.
+Negative scores are possible but should be avoided as the goal is to get a high score.
+
+<p>Tips:
+<ul>
+    <li>The sprat deck turns over infrequently enough that it's easy to forget about it. But getting rid of the sprat deck is the only way to win, and each card left in your sprat deck hurts.</li>
+    <li>It's tempting to try to prevent other players from playing on "your cards" by focusing on the piles instead of the ace piles, but your only source of points is exactly the cards you get on the ace piles, so resist that temptation.</li>
+</ul>
+
+<h1>todo</h1>
+<ul>
+    <li>implement flip deck view</li>
+    <li>implement pile moves</li>
+    <li>implement implement "RoundState": in progress, draw, won</li>
+    <li>implement game stats</li>
+    <li>make round ids part of URIs so multiple consecutive games can happen</li>
+    <li>make client side long-poll server to update ace piles</li>
+    <li>generalize sprat_to_ace/pile_to_ace/etc interfaces</li>
+    <li>enable moving cards from the sprat/flip decks to the piles</li>
+    <li>persistent player stats</li>
+    <li>persistent game states</li>
+    <li>persistent game states</li>
+</ul>
+</body>
+</html>
