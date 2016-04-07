@@ -239,6 +239,8 @@ def add_player(game_token, player):
 
 @app.route("/start_game/<game_token>")
 def start_game(game_token):
+    if game_token in sgs_map:
+        return "ERROR: can not restart an already started game"
     sgs_map[game_token] = SpratGameState(player_map[game_token])
     return "GO FOR LAUNCH!"
 
