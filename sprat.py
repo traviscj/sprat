@@ -13,7 +13,6 @@ ASSET_FACE_OVERRIDES = {
     "j": "jack",
     "q": "queen",
     "k": "king",
-    # "10": "ten"
 }
 
 SUIT_COLOR = {
@@ -104,7 +103,6 @@ class FlipDeck(object):
                 
             flip = self.in_hand.pop(0)
             self.on_table.append(flip)
-        print "new state:", self.on_table
     def get(self):
         return self.on_table.pop()
     def __repr__(self):
@@ -122,13 +120,6 @@ class SpratGamePlayerState(object):
             deck_slice = deck[13+pile_index:13+pile_index+1][0]
             self.piles[pile_index] = Pile(deck_slice)
         self.flip_deck = FlipDeck(deck[13+4:])
-    def show(self):
-        print "---"
-        print self.sprat_deck
-        print "piles:"
-        for pile in self.piles:
-            print " - ", self.piles[pile]
-        print self.flip_deck
     def __repr__(self):
         return "SpratGamePlayerState(name={name}, )".format(name=self.name)
 
@@ -139,7 +130,7 @@ class AcePile(object):
         if len(self.cards)==0:
             return card.face == "ACE"
 
-        print "ace pile can_place check:",self.cards
+        print("ace pile can_place check:", self.cards)
         same_suit = self.cards[0].suit == card.suit
         
         last_card_face_index = FACES.index(self.cards[-1].face)
@@ -175,21 +166,21 @@ class SpratGameState(object):
                 self.ace_piles[suit][player] = AcePile()
         
         for player in players:
-            print player, self.player_states[player]
+            print(player, self.player_states[player])
     # def can_to_ace_piles(self, card):
     def show(self):
-        print "Ace Piles:"
+        print("Ace Piles:")
         for suit in SUITS:
             for player in self.players:
-                print " -", self.ace_piles[suit][player]
+                print(" -", self.ace_piles[suit][player])
         for player in self.players:
             self.player_states[player].show()
     def get_ace_piles(self):
         return [self.ace_piles[suit][player].cards[-1] for suit in SUITS for player in self.players if len(self.ace_piles[suit][player].cards) > 0]
-    def to_ace_piles(self, card):
+    def to_ace_piles(self, card, buried=False):
         for suit in SUITS:
             for player in self.players:
-                if self.ace_piles[suit][player].can_place(card):
+                if self.ace_piles[suit][player].can_place(card) and not buried:
                     self.ace_piles[suit][player].place(card)
                     return "moved {} to ace pile".format(card)
         for pile_index, pile in self.player_states[card.player].piles.items():
@@ -267,7 +258,7 @@ def sprat_to_ace(game_token, player):
 def pile_to_ace(game_token, player, pile):
     sgs = sgs_map[game_token]
     player_state = sgs.player_states[player]
-    print player_state.piles[pile].cards
+    print(player_state.piles[pile].cards)
     res = player_state.piles[pile].cards.pop()
     result = sgs.to_ace_piles(res)
     if result == COULD_NOT_MOVE:
@@ -282,7 +273,8 @@ def stack_to_ace(game_token, player, pile, pile_index):
     stack = player_state.piles[pile].cards[pile_index:]
     player_state.piles[pile].cards[pile_index:] = []
     res = stack[0]
-    result = sgs.to_ace_piles(res)
+    buried = len(stack) > 1
+    result = sgs.to_ace_piles(res, buried)
     if result == COULD_NOT_MOVE:
         player_state.piles[pile].cards.extend(stack)
     else:
@@ -292,8 +284,6 @@ def stack_to_ace(game_token, player, pile, pile_index):
             sgs.to_ace_piles(res)
     flash(result)
     return redirect(url_for('html_sgs', game_token=game_token, player=player))
-    
-
 @app.route('/<game_token>/flip_to_ace/<player>')
 def flip_to_ace(game_token, player):
     sgs = sgs_map[game_token]
@@ -316,7 +306,7 @@ def flip(game_token, player):
 @app.route('/<game_token>/<player>')
 def html_sgs(game_token, player):
     sgs = sgs_map[game_token]
-    winners = [player for player, state in sgs.player_states.items() if state.sprat_deck.top_card is None]
+    winners = [p for p, state in sgs.player_states.items() if state.sprat_deck.top_card is None]
     if len(winners) > 0:
         flash("game is over!, won by {}".format(winners))
     cur_player = sgs.player_states[player]
@@ -339,10 +329,3 @@ if __name__ == '__main__':
     else:
         hostname = "127.0.0.1"
     app.run(hostname, debug=True)
-
-
-# sgs.player_states["traviscj"].show()
-# sgs.player_states["traviscj"].show_flip()
-# sgs.player_states["traviscj"].show()
-# sgs.player_states["traviscj"].show_flip()
-# sgs.player_states["traviscj"].show()
