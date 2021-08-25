@@ -1,3 +1,5 @@
+# import enum
+import enum
 import json
 import random
 from random import choice
@@ -6,6 +8,47 @@ from string import ascii_uppercase
 
 use_random = True
 
+class CardColor(enum.Enum):
+    RED = 1
+    BLACK = 2
+
+class CardSuit(enum.Enum):
+    HEARTS = (1, "♥", CardColor.RED)
+    DIAMONDS = (2, "♦", CardColor.RED)
+    SPADES = (3, "♠", CardColor.BLACK)
+    CLUBS = (4, "♣", CardColor.BLACK)
+
+    def icon(self):
+        return self.value[1]
+
+
+
+
+class CardFace(enum.Enum):
+    ACE = (1, "ACE", )
+    TWO = (2, "2", )
+    THREE = (3, "3", )
+    FOUR = (4, "4", )
+    FIVE = (5, "5", )
+    SIX = (6, "6", )
+    SEVEN = (7, "7", )
+    EIGHT = (8, "8", )
+    NINE = (9, "9", )
+    TEN = (10, "10", )
+    JACK = (11, "JACK", )
+    QUEEN = (12, "QUEEN", )
+    KING = (13, "KING", )
+
+    def asset_face(self):
+        asset_face = self.value[1].lower()
+        return asset_face
+
+    def short(self):
+        if self == CardFace.TEN:
+            return "T"
+        return self.value[1][0]
+
+SUITS_UNICODE = "♥","♦","♠","♣"
 SUITS = "HEARTS", "DIAMONDS", "SPADES", "CLUBS"
 FACES = "ACE", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"
 
@@ -19,16 +62,22 @@ SUIT_COLOR = {
     "HEARTS": "RED",
     "DIAMONDS": "RED",
     "SPADES": "BLACK",
-    "CLUBS": "BLACK"
+    "CLUBS": "BLACK",
+}
+SUITS_UNICODE = {
+    "HEARTS": "♥",
+    "DIAMONDS": "♦",
+    "SPADES": "♠",
+    "CLUBS": "♣",
 }
 
 class Card(object):
-    def __init__(self, player, suit, face):
+    def __init__(self, player, suit: CardSuit, face: CardFace):
         self.player = player
         self.suit = suit
         self.face = face
     def __str__(self):
-        return self.player[0] + self.face[0] + self.suit[0]
+        return self.player[0] + self.face.short() + self.suit.icon()
     def asset(self):
         asset_face = self.face.lower()
         if asset_face in ASSET_FACE_OVERRIDES:
@@ -85,7 +134,7 @@ class Pile(object):
     def place(self, card):
         self.cards.append(card)
     def __str__(self):
-        return "Pile(" + ",".join(str(c) for c in self.cards)+ ")"
+        return "Pile(" + ",".join(c.__str__() for c in self.cards)+ ")"
     def __repr__(self):
         return "Pile({})".format(self.cards)
 
@@ -103,8 +152,14 @@ class FlipDeck(object):
                 
             flip = self.in_hand.pop(0)
             self.on_table.append(flip)
+    def peek(self):
+        return self.on_table[-1]
     def get(self):
         return self.on_table.pop()
+    def rotate(self):
+        flip = self.in_hand.pop(0)
+        self.on_table.append(flip)
+
     def __repr__(self):
         return "FlipDeck(showing={})".format(len(self.on_table) > 0 and self.on_table[-1] or None)
 
@@ -120,6 +175,8 @@ class SpratGamePlayerState(object):
             deck_slice = deck[13+pile_index:13+pile_index+1][0]
             self.piles[pile_index] = Pile(deck_slice)
         self.flip_deck = FlipDeck(deck[13+4:])
+    def rotate(self):
+        self.flip_deck.rotate()
     def __repr__(self):
         return "SpratGamePlayerState(name={name}, )".format(name=self.name)
 
@@ -207,6 +264,9 @@ class SpratGameState(object):
         return result
     def count_sprats(self):
         return {player:self.player_states[player].sprat_deck.count() for player in self.players}
+    def rotate(self):
+        for player, player_game_state in self.player_states.items():
+            player_game_state.rotate()
             
 
 from flask import Flask, url_for, render_template, flash, redirect, jsonify
@@ -235,6 +295,19 @@ def start_game(game_token):
         return "ERROR: can not restart an already started game"
     sgs_map[game_token] = SpratGameState(player_map[game_token])
     return "GO FOR LAUNCH!"
+
+@app.route("/game/<names>")
+def new_game2(names):
+    players = names.split(",")
+    game_token = get_token()
+    player_map[game_token] = []
+    for player in players:
+        player_map[game_token].append(player)
+    sgs_map[game_token] = SpratGameState(player_map[game_token])
+    return render_template("start.html",
+                           game_token=game_token,
+        players=players,
+                           )
 
 @app.route("/game_states")
 def game_states():
@@ -303,6 +376,12 @@ def flip(game_token, player):
     flash("flipped flip deck")
     return redirect(url_for('html_sgs', game_token=game_token, player=player))
 
+@app.route("/rotate/<game_token>")
+def rotate(game_token):
+    sgs = sgs_map[game_token]
+    sgs.rotate()
+    return "successfully rotated!"
+
 @app.route('/<game_token>/<player>')
 def html_sgs(game_token, player):
     sgs = sgs_map[game_token]
@@ -315,6 +394,7 @@ def html_sgs(game_token, player):
         player=player,
         ace_piles=sgs.get_ace_piles(),
         sprat_top=cur_player.sprat_deck.top_card,
+        sprat_count=cur_player.sprat_deck.count(),
         piles=cur_player.piles,
         flip_deck=cur_player.flip_deck,
         round_stats=sgs.count_scores(),

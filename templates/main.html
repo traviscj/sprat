@@ -23,7 +23,7 @@
         {{ card_img(ace_pile) }}
     {% endfor %}
 
-<h1>sprat deck</h1>
+<h1>sprat deck {{ sprat_count }}</h1>
     {% if sprat_top %}
         <!-- replace this with a url_for -->
         <a href="/{{ game_token }}/sprat_to_ace/{{player}}">

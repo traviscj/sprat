@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>start!</title>
+</head>
+<body>
+{% for player in players %}
+    <li>
+        <a href="/{{ game_token }}/{{player}}">
+            {{ player }}
+        </a>
+    </li>
+{% endfor %}
+</body>
+</html>
