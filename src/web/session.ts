@@ -1,7 +1,7 @@
 import type { BotEvent } from '../bots/bot.ts';
 import { profile } from '../bots/profile.ts';
 import { DEFAULT_RULES, type Move, type Rules } from '../engine/state.ts';
-import { redact, type ClientMsg, type GameView, type SeatInfo, type ServerMsg } from '../server/protocol.ts';
+import { redact, type ClientMsg, type GameView, type RoundRow, type SeatInfo, type ServerMsg } from '../server/protocol.ts';
 import { Driver, type Seat } from '../sim/driver.ts';
 
 export interface RoundInfo { roundScores: number[]; totals: number[]; caller: number; gameOver: boolean }
@@ -11,6 +11,7 @@ export interface Session {
   view: GameView | null;
   seats: SeatInfo[];
   host: boolean;
+  history: RoundRow[];
   now(): number;
   move(m: Move): void;
   addBot(preset: string, overrides?: Record<string, number>): void;
@@ -27,7 +28,7 @@ export interface Session {
 const noop = (..._a: unknown[]) => {};
 
 export class LocalSession implements Session {
-  kind = 'local' as const; me = 0; view: GameView | null = null; host = true;
+  kind = 'local' as const; me = 0; view: GameView | null = null; host = true; history: RoundRow[] = [];
   seats: SeatInfo[] = [];
   private seatDefs: Seat[] = [];
   private driver: Driver | null = null;
@@ -50,6 +51,7 @@ export class LocalSession implements Session {
       this.stop?.(); this.stop = null;
       this.totals = d.state.players.map(P => P.score);
       const gameOver = this.totals.some(t => t >= this.rules.targetScore);
+      this.history.push({ round: this.round, scores: sc, totals: [...this.totals], caller: d.state.caller, names: d.state.players.map(P => P.name), durMs: d.now });
       this.refresh();
       this.onRound({ roundScores: sc, totals: this.totals, caller: d.state.caller, gameOver });
       if (gameOver) { this.round = 0; this.totals = []; } else this.round++;
@@ -64,7 +66,7 @@ export class LocalSession implements Session {
 }
 
 export class RemoteSession implements Session {
-  kind = 'remote' as const; me = -1; view: GameView | null = null; seats: SeatInfo[] = []; host = false;
+  kind = 'remote' as const; me = -1; view: GameView | null = null; seats: SeatInfo[] = []; host = false; history: RoundRow[] = [];
   private ws: WebSocket; private t0 = 0; private serverNow = 0;
   onChange = noop; onEvent: (e: BotEvent) => void = noop; onRound: (r: RoundInfo) => void = noop; onError = noop;
   constructor(url: string, room: string, name: string, spectate = false) {
@@ -80,6 +82,7 @@ export class RemoteSession implements Session {
         case 'applied': if (!m.r.ok && m.p === this.me) this.onError(m.r.why); break;
         case 'event': this.onEvent(m.e); break;
         case 'round': this.onRound(m); break;
+        case 'history': this.history = m.rows; this.onChange(); break;
         case 'error': this.onError(m.msg); break;
       }
     };

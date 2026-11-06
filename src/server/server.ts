@@ -4,7 +4,7 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { PRESETS, profile } from '../bots/profile.ts';
 import { DEFAULT_RULES, type Rules } from '../engine/state.ts';
 import { Driver, type Seat } from '../sim/driver.ts';
-import { redact, type ClientMsg, type SeatInfo, type ServerMsg } from './protocol.ts';
+import { redact, type ClientMsg, type RoundRow, type SeatInfo, type ServerMsg } from './protocol.ts';
 
 const PORT = +(process.env.PORT ?? 8787);
 const MAX_SEATS = 8;
@@ -16,6 +16,7 @@ class Room {
   seats: RoomSeat[] = [];
   spectators = new Set<Conn>();
   autoloop = false;
+  history: RoundRow[] = [];
   host = 0;
   driver: Driver | null = null;
   stopBots: (() => void) | null = null;
@@ -41,7 +42,10 @@ class Room {
       this.totals = d.state.players.map(P => P.score);
       const gameOver = this.totals.some(t => t >= this.rules.targetScore);
       this.pushState();
+      this.history.push({ round: this.round, scores: sc, totals: [...this.totals], caller: d.state.caller, names: d.state.players.map(P => P.name), durMs: d.now });
+      if (this.history.length > 50) this.history.shift();
       this.broadcast(() => ({ t: 'round', roundScores: sc, totals: this.totals, caller: d.state.caller, gameOver }));
+      this.broadcast(() => ({ t: 'history', rows: this.history }));
       if (gameOver) { this.round = 0; this.totals = []; } else this.round++;
       if (this.autoloop) setTimeout(() => { if (this.driver === d) this.start(this.rules); }, 8000);
     };
@@ -82,12 +86,12 @@ wss.on('connection', ws => {
       const code = (m.room || 'lobby').toLowerCase();
       let room = rooms.get(code); if (!room) { room = new Room(code); rooms.set(code, room); }
       // reconnect to an existing human seat by name, else new seat
-      if (m.spectate) { conn = { ws, room, seat: -1 }; room.spectators.add(conn); room.send(conn, { t: 'hello', you: -1, room: code }); room.lobby(); room.pushState(); return; }
+      if (m.spectate) { conn = { ws, room, seat: -1 }; room.spectators.add(conn); room.send(conn, { t: 'hello', you: -1, room: code }); room.lobby(); room.send(conn, { t: 'history', rows: room.history }); room.pushState(); return; }
       let seat = room.seats.findIndex(s => !s.bot && s.name === m.name);
       if (seat < 0) { if (room.seats.length >= MAX_SEATS) return ws.send(JSON.stringify({ t: 'error', msg: 'room full' })); room.seats.push({ id: `h${Date.now()}`, name: m.name || `p${room.seats.length}` }); seat = room.seats.length - 1; }
       conn = { ws, room, seat }; room.seats[seat].conn = conn;
       room.send(conn, { t: 'hello', you: seat, room: code });
-      room.lobby(); room.pushState();
+      room.lobby(); room.send(conn, { t: 'history', rows: room.history }); room.pushState();
       return;
     }
     if (conn) conn.room.handle(conn, m);

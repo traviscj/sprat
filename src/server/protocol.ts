@@ -14,6 +14,7 @@ export interface GameView {
   seed: number; round: number; rules: Rules; players: PlayerView[]; foundations: Foundation[];
   over: boolean; caller: number; t: number; seq: number;
 }
+export interface RoundRow { round: number; scores: number[]; totals: number[]; caller: number; names: string[]; durMs: number }
 export interface SeatInfo { name: string; bot: boolean; preset?: string; connected: boolean }
 
 export type ClientMsg =
@@ -31,6 +32,7 @@ export type ServerMsg =
   | { t: 'applied'; p: number; m: Move; r: Result; seq: number }
   | { t: 'event'; e: BotEvent }
   | { t: 'round'; roundScores: number[]; totals: number[]; caller: number; gameOver: boolean }
+  | { t: 'history'; rows: RoundRow[] }
   | { t: 'error'; msg: string };
 
 /** What player `me` is allowed to see. me=-1 ⇒ spectator (sees everything; used by the stats panel). */

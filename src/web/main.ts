@@ -40,7 +40,7 @@ sess.onEvent = e => {
 const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
 const deckColor = (d: number) => `var(--d${d % 8})`;
 const cardHtml = (c: Card, cls = '', attrs = '', badge = '') =>
-  `<div class="c ${isRed(c) ? 'r' : ''} ${cls}" style="--dc:${deckColor((c / 52) | 0)}" ${attrs}><span>${RANKS[rankOf(c) - 1]}</span><span class="s">${SUITS[suitOf(c)]}</span><i class="d"></i>${badge}</div>`;
+  `<div class="c ${isRed(c) ? 'r' : ''} ${cls}" data-c="${c}" style="--dc:${deckColor((c / 52) | 0)}" ${attrs}><span>${RANKS[rankOf(c) - 1]}</span><span class="s">${SUITS[suitOf(c)]}</span><i class="d"></i>${badge}</div>`;
 const backHtml = (d: number, cls = '', attrs = '', badge = '') => `<div class="c back ${cls}" style="--dc:${deckColor(d)}" ${attrs}>${badge}</div>`;
 const emptyHtml = (label: string, cls = '', attrs = '') => `<div class="c empty ${cls}" ${attrs}>${label}</div>`;
 const fmtT = (ms: number) => { const s = Math.max(0, ms / 1000) | 0; return `${(s / 60) | 0}:${String(s % 60).padStart(2, '0')}`; };
@@ -51,6 +51,21 @@ function selectedCard(v: GameView): Card | undefined {
   if (sel.src === 'N') return P.nerts.at(-1);
   if (sel.src === 'S') return P.waste.at(-1);
   return P.work[sel.w][P.work[sel.w].length - sel.n];
+}
+
+// ---------- FLIP card animation: snapshot positions by card id before re-render, translate from old → new after ----------
+let prevRects = new Map<number, DOMRect>();
+function snapshot() { const m = new Map<number, DOMRect>(); app.querySelectorAll<HTMLElement>('.c[data-c]').forEach(el => { if (!el.closest('#log,#hist')) m.set(+el.dataset.c!, el.getBoundingClientRect()); }); return m; }
+function animateFrom(m: Map<number, DOMRect>) { prevRects = m; }
+function animateTo() {
+  if (!prevRects.size) return;
+  app.querySelectorAll<HTMLElement>('.c[data-c]').forEach(el => {
+    const old = prevRects.get(+el.dataset.c!); if (!old) return;
+    const nw = el.getBoundingClientRect(); const dx = old.left - nw.left, dy = old.top - nw.top;
+    if (Math.abs(dx) < 2 && Math.abs(dy) < 2) return;
+    el.style.transition = 'none'; el.style.transform = `translate(${dx}px,${dy}px)`; el.style.zIndex = '40';
+    requestAnimationFrame(() => { el.style.transition = 'transform 260ms cubic-bezier(.2,.8,.2,1)'; el.style.transform = ''; setTimeout(() => { el.style.zIndex = ''; el.style.transition = ''; }, 300); });
+  });
 }
 
 // ---------- render ----------
@@ -79,14 +94,15 @@ function render() {
   const n = v.players.length, kq = ((Math.round((me * 4) / n) % 4) + 4) % 4;
   const rot = (x: number, y: number): [number, number] => { for (let k = 0; k < kq; k++) [x, y] = [y, -x]; return [x, y]; };
   const allowed = allowedCells(v as any);
-  let Rd = 0; for (const f of v.foundations) Rd = Math.max(Rd, Math.abs(f.cx), Math.abs(f.cy)); for (const c of allowed) Rd = Math.max(Rd, Math.abs(c[0]), Math.abs(c[1]));
-  const side = 2 * Rd + 1; const cells: string[] = new Array(side * side).fill('');
-  const idx = (x: number, y: number) => { const [rx, ry] = rot(x, y); return (ry + Rd) * side + (rx + Rd); };
+  const pts: [number, number][] = [...v.foundations.map(f => rot(f.cx, f.cy)), ...allowed.map(c => rot(c[0], c[1]))];
+  const minX = Math.min(...pts.map(p => p[0])), maxX = Math.max(...pts.map(p => p[0])), minY = Math.min(...pts.map(p => p[1])), maxY = Math.max(...pts.map(p => p[1]));
+  const side = maxX - minX + 1, rows = maxY - minY + 1; const cells: string[] = new Array(side * rows).fill('');
+  const idx = (x: number, y: number) => { const [rx, ry] = rot(x, y); return (ry - minY) * side + (rx - minX); };
   const aceSel = selC !== undefined && rankOf(selC) === 1;
-  for (const c of allowed) cells[idx(c[0], c[1])] = emptyHtml(aceSel ? 'A' : '', aceSel ? 'hot' : 'dim', `data-f="-1" data-cx="${c[0]}" data-cy="${c[1]}"`);
+  for (const c of allowed) cells[idx(c[0], c[1])] = emptyHtml(aceSel ? 'A' : '·', aceSel ? 'hot' : 'slot', `data-f="-1" data-cx="${c[0]}" data-cy="${c[1]}"`);
   v.foundations.forEach((f, i) => { const t = f.cards.at(-1)!; cells[idx(f.cx, f.cy)] = cardHtml(t, `${hotF(i) ? 'hot' : ''} ${f.cards.length === 13 ? 'dim' : ''} ${inspect === i ? 'sel' : ''} ${f.dirty && spec ? 'dirty' : ''}`, `data-f="${i}"`, `<span class="cnt">${f.cards.length}</span>`); });
-  const fch = Math.max(34, Math.min(100, Math.floor((window.innerWidth >= 900 ? 300 : 150) / side))), fcw = Math.round(fch * 0.72);
-  const found = `<section id="found" style="--cw:${fcw}px;--ch:${fch}px;--fs:${Math.round(fch * 0.26)}px"><div class="grid" style="grid-template-columns:repeat(${side},var(--cw))">${cells.map(c => c || '<div class="cell"></div>').join('')}</div>
+  const fch = Math.max(34, Math.min(96, Math.floor((window.innerWidth >= 900 ? 400 : 170) / Math.max(side, rows)))), fcw = Math.round(fch * 0.72);
+  const found = `<section id="found" style="--cw:${fcw}px;--ch:${fch}px;--fs:${Math.round(fch * 0.26)}px"><div class="grid" style="grid-template-columns:repeat(${side},var(--cw))">${cells.map(c => c || '<div></div>').join('')}</div>
     <div class="side"><span class="lbl" data-a="autof" title="auto-play selected card up">▲ auto</span>
     ${inspect !== null && v.foundations[inspect] ? `<div style="display:flex;gap:2px;align-items:center;flex-wrap:wrap;--cw:26px;--ch:34px">${v.foundations[inspect].cards.map(c => cardHtml(c, '', '', '')).join('')}<button data-a="challenge" data-f="${inspect}" class="warn">challenge</button><button data-a="uninspect">×</button></div>` : ''}</div>
   </section>`;
@@ -123,7 +139,14 @@ function render() {
     <table><tr><th>name</th><th class="n">round</th><th class="n">total</th></tr>${v.players.map((p, i) => `<tr style="color:${deckColor(i)}"><td>${esc(p.name)}</td><td class="n">${round!.roundScores[i]}</td><td class="n">${round!.totals[i]}</td></tr>`).join('')}</table>
     ${round.gameOver ? '<b class="ok">game over</b>' : ''} ${sess.host ? '<button data-a="next">next round</button>' : '<span class="dim">waiting for host</span>'}</div></div>` : '';
 
-  app.innerHTML = `<div id="table">${header}${opps}${found}${meSec}</div>${footer}${roundOv}`;
+  const hist = sess.history.slice(-12).reverse();
+  const names = hist[0]?.names ?? v.players.map(p => p.name);
+  const histHtml = `<div id="hist"><span class="lbl">rounds</span><table><tr><th>#</th><th class="n">dur</th><th>sprat</th>${names.map((nm, i) => `<th class="n" style="color:${deckColor(i)}">${esc(nm)}</th>`).join('')}</tr>
+    ${hist.map(h => `<tr><td class="n">${h.round + 1}</td><td class="n dim">${fmtT(h.durMs)}</td><td>${h.caller >= 0 ? `<span style="color:${deckColor(h.caller)}">${esc(h.names[h.caller])}</span>` : '<span class="dim">stall</span>'}</td>${h.scores.map((sc, i) => `<td class="n"><span class="${sc > 0 ? 'ok' : sc < 0 ? 'bad' : 'dim'}">${sc > 0 ? '+' : ''}${sc}</span> <span class="dim">${h.totals[i]}</span></td>`).join('')}</tr>`).join('')}
+    ${hist.length ? '' : '<tr><td colspan="9" class="dim">no rounds yet</td></tr>'}</table></div>`;
+  animateFrom(snapshot());
+  app.innerHTML = `<div id="table">${header}${opps}${found}${meSec}</div>${footer.replace('</footer>', histHtml + '</footer>')}${roundOv}`;
+  animateTo();
   if (!tickTimer) tickTimer = setTimeout(tick, 1000);
 }
 function tick() { tickTimer = null; const el = document.getElementById('clk'); if (el && sess.view && !sess.view.over) { el.textContent = fmtT(sess.now()); tickTimer = setTimeout(tick, 1000); } }

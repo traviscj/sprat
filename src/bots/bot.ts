@@ -133,7 +133,7 @@ export class Bot {
               if (!this.canWorkB(env, bottom, w2)) return;
               if (this.lastW2W && this.lastW2W.from === j && this.lastW2W.to === i && this.lastW2W.n === k) return; // no ping-pong
               let sc = -1 - buryPen(w2);
-              if (k === w.length) sc += n !== undefined ? 15 : 0;             // frees a pile for the nerts card
+              if (k === w.length) sc += n !== undefined ? 15 + pr.wUnblock : 0; // frees a pile for the nerts card = nerts progress
               else { const exposed = w[w.length - k - 1]; if (this.fTarget(env, exposed) !== undefined) sc += 20; if (n !== undefined && this.canWorkB(env, n, [exposed])) sc += 12; }
               if (w2.length === 0 && sc < 0) return;                          // never shuffle into an empty pile for no reason
               if (sc > 0) out.push({ m: { k: 'W2W', from: i, n: k, to: j }, score: sc });

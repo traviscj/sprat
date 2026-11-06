@@ -185,17 +185,23 @@ export function roundScores(s: GameState): number[] {
 export const isStuck = (s: GameState, p: number) => legalMoves(s, p).every(m => m.k === 'FLIP');
 export const playerSummary = (P: PlayerState) => `${P.name}: nerts=${P.nerts.length} stock=${P.stock.length} waste=${P.waste.length}`;
 
-// ---- table geometry: foundations on an integer grid; square grows 1→9→25… ----
-/** Chebyshev radius of the current square (0 until the centre is taken). */
+// ---- table geometry: foundations on an integer grid. New piles go on the frontier (4-adjacent to an
+// existing pile), bounded by a radius sized for 4n piles, so the shape is organic but compact. ----
 export function gridRadius(s: GameState): number {
   let r = 0; for (const f of s.foundations) r = Math.max(r, Math.abs(f.cx), Math.abs(f.cy)); return r;
 }
+export const maxRadius = (n: number) => Math.ceil(Math.sqrt(4 * n) / 2);
 export function cellTaken(s: GameState, x: number, y: number): boolean { return s.foundations.some(f => f.cx === x && f.cy === y); }
-/** Empty cells inside the current square; if it's full, the next ring. */
+/** Empty frontier cells: origin if empty, else 4-neighbours of occupied cells within maxRadius. */
 export function allowedCells(s: GameState): [number, number][] {
-  const R = gridRadius(s);
-  const ring = (r: number) => { const out: [number, number][] = []; for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) if (!cellTaken(s, x, y)) out.push([x, y]); return out; };
-  const inner = ring(R); return inner.length ? inner : ring(R + 1);
+  if (s.foundations.length === 0) return [[0, 0]];
+  const R = maxRadius(s.players.length), seen = new Set<string>(), out: [number, number][] = [];
+  for (const f of s.foundations) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const x = f.cx + dx, y = f.cy + dy, k = `${x},${y}`;
+    if (Math.abs(x) > R || Math.abs(y) > R || seen.has(k) || cellTaken(s, x, y)) continue;
+    seen.add(k); out.push([x, y]);
+  }
+  return out;
 }
 /** Seat i of n sits at angle θ around the square, seat 0 at the bottom (+y is "toward seat 0"). */
 export function seatAngle(i: number, n: number): number { return Math.PI / 2 + (2 * Math.PI * i) / n; }
