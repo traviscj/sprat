@@ -16,6 +16,7 @@ const app = document.getElementById('app')!;
 
 type Sel = { src: 'N' } | { src: 'S' } | { src: 'W'; w: number; n: number } | null;
 let sel: Sel = null;
+let povSel = +(q.get('pov') ?? 0);   // spectator: whose seat to render from
 let inspect: number | null = null;       // foundation being inspected (house rules)
 let round: RoundInfo | null = null;
 let err = '';
@@ -57,7 +58,8 @@ let tickTimer: ReturnType<typeof setTimeout> | null = null;
 function render() {
   const v = sess.view;
   if (!v) { app.innerHTML = setupHtml(); return; }
-  const me = sess.me;
+  const spec = sess.me < 0;
+  const me = spec ? Math.min(povSel, v.players.length - 1) : sess.me;
   const P = v.players[me] ?? { nerts: [], nertsCount: 0, work: [], stock: [], stockCount: 0, waste: [], wasteCount: 0, calledNerts: false };
   const selC = selectedCard(v);
   const hotF = (f: number) => selC !== undefined && (f === -1 ? rankOf(selC) === 1 : canFoundation(selC, v.foundations[f]));
@@ -65,7 +67,7 @@ function render() {
 
   const header = `<header>
     <span class="dim">r${v.round + 1}</span> <span class="n" id="clk">${fmtT(sess.now())}</span>
-    ${v.players.map((p, i) => `<span class="pl" style="color:${deckColor(i)}"><b>${esc(p.name)}</b><span class="n ${p.nertsCount === 0 ? 'ok' : p.nertsCount <= 3 ? 'warn' : ''}">n${p.nertsCount}</span><span class="n dim">s${p.stockCount + p.wasteCount}</span><span class="n">${p.score}</span></span>`).join('')}
+    ${v.players.map((p, i) => `<span class="pl ${spec ? 'clk' : ''} ${i === me ? 'pov' : ''}" data-pov="${i}" style="color:${deckColor(i)}"><b>${esc(p.name)}</b><span class="n ${p.nertsCount === 0 ? 'ok' : p.nertsCount <= 3 ? 'warn' : ''}">n${p.nertsCount}</span><span class="n dim">s${p.stockCount + p.wasteCount}</span><span class="n">${p.score}</span></span>`).join('')}
     ${v.rules.houseRules ? '<span class="warn">house</span>' : ''}
     ${err ? `<span class="bad">${esc(err)}</span>` : ''}
     <span style="flex:1"></span>
@@ -91,7 +93,7 @@ function render() {
     </div>`).join('');
   const waste = P.waste.slice(-3);
   const meSec = `<section id="me">
-    <div class="col"><span class="lbl">sprat ${P.nertsCount}</span><div class="pile">${nertsTop !== undefined ? cardHtml(nertsTop, sel?.src === 'N' ? 'sel' : '', 'data-src="N"', `<span class="cnt">${P.nertsCount}</span>`) : emptyHtml(P.calledNerts ? 'called' : 'empty', '', '')}</div>
+    <div class="col"><span class="lbl">${spec ? `👁 ${esc(v.players[me]?.name ?? '')} · ` : ''}sprat ${P.nertsCount}</span><div class="pile">${nertsTop !== undefined ? cardHtml(nertsTop, sel?.src === 'N' ? 'sel' : '', 'data-src="N"', `<span class="cnt">${P.nertsCount}</span>`) : emptyHtml(P.calledNerts ? 'called' : 'empty', '', '')}</div>
       ${P.nertsCount === 0 && !P.calledNerts && !v.over ? '<button data-a="nerts" class="ok" style="font-weight:700">SPRAT!</button>' : ''}</div>
     <div id="work">${myWork}</div>
     <div class="col"><span class="lbl">river</span><div class="fanh">${waste.length ? waste.map((c, j) => cardHtml(c, j === waste.length - 1 && sel?.src === 'S' ? 'sel' : '', j === waste.length - 1 ? 'data-src="S"' : '', `<span class="cnt" style="display:none"></span>`).replace('class="c', `style="--i:${j};left:${j * 10}px;z-index:${j}" class="c`)).join('') : emptyHtml('')}</div><span class="n dim">${P.wasteCount}</span></div>
@@ -110,7 +112,7 @@ function render() {
     <table><tr><th>name</th><th class="n">round</th><th class="n">total</th></tr>${v.players.map((p, i) => `<tr style="color:${deckColor(i)}"><td>${esc(p.name)}</td><td class="n">${round!.roundScores[i]}</td><td class="n">${round!.totals[i]}</td></tr>`).join('')}</table>
     ${round.gameOver ? '<b class="ok">game over</b>' : ''} ${sess.host ? '<button data-a="next">next round</button>' : '<span class="dim">waiting for host</span>'}</div></div>` : '';
 
-  app.innerHTML = `<div id="table">${header}${found}${opps}${me >= 0 ? meSec : '<section class="dim">spectating</section>'}</div>${footer}${roundOv}`;
+  app.innerHTML = `<div id="table">${header}${found}${opps}${meSec}</div>${footer}${roundOv}`;
   if (!tickTimer) tickTimer = setTimeout(tick, 1000);
 }
 function tick() { tickTimer = null; const el = document.getElementById('clk'); if (el && sess.view && !sess.view.over) { el.textContent = fmtT(sess.now()); tickTimer = setTimeout(tick, 1000); } }
@@ -131,6 +133,8 @@ function setupHtml() {
 
 // ---------- input ----------
 app.addEventListener('click', ev => {
+  const pv = (ev.target as HTMLElement).closest<HTMLElement>('[data-pov]');
+  if (pv && sess.me < 0) { povSel = +pv.dataset.pov!; sel = null; render(); return; }
   const el = (ev.target as HTMLElement).closest<HTMLElement>('[data-a],[data-src],[data-f],[data-w]');
   if (!el) { sel = null; render(); return; }
   const a = el.dataset.a;
