@@ -76,8 +76,11 @@ export function legalMoves(s: GameState, p: number): Move[] {
   return out;
 }
 
-function pushFoundation(s: GameState, c: Card, f: number, p: number, at?: number): number {
-  if (f === -1) { s.foundations.push({ cards: [c], suit: suitOf(c), dirty: false, mess: 0, at: at ?? p, owner: p }); return s.foundations.length - 1; }
+function pushFoundation(s: GameState, c: Card, f: number, p: number, cell?: [number, number]): number {
+  if (f === -1) {
+    const [cx, cy] = cell ?? nearestCell(s, p);
+    s.foundations.push({ cards: [c], suit: suitOf(c), dirty: false, mess: 0, cx, cy, owner: p }); return s.foundations.length - 1;
+  }
   s.foundations[f].cards.push(c);
   return f;
 }
@@ -88,8 +91,9 @@ export function apply(s: GameState, p: number, m: Move): Result {
   const P = s.players[p];
   const house = s.rules.houseRules;
   const F = (f: number) => (f === -1 ? undefined : s.foundations[f]);
-  const fCheck = (c: Card, f: number): { ok: boolean; cheat?: 'skip' } => {
+  const fCheck = (c: Card, f: number, cell?: [number, number]): { ok: boolean; cheat?: 'skip' } => {
     if (f !== -1 && !s.foundations[f]) return { ok: false };
+    if (f === -1 && cell && !allowedCells(s).some(([x, y]) => x === cell[0] && y === cell[1])) return { ok: false };
     if (canFoundation(c, F(f))) return { ok: true };
     if (house && canFoundationCheat(c, F(f))) return { ok: true, cheat: 'skip' };
     return { ok: false };
@@ -98,8 +102,8 @@ export function apply(s: GameState, p: number, m: Move): Result {
   switch (m.k) {
     case 'N2F': {
       const c = top(P.nerts); if (c === undefined) return { ok: false, why: 'nerts empty' };
-      const r = fCheck(c, m.f); if (!r.ok) return { ok: false, why: 'foundation refuses' };
-      P.nerts.pop(); const fi = pushFoundation(s, c, m.f, p, m.at); if (r.cheat) { cheat = r.cheat; s.foundations[fi].dirty = true; }
+      const r = fCheck(c, m.f, m.cell); if (!r.ok) return { ok: false, why: 'foundation refuses' };
+      P.nerts.pop(); const fi = pushFoundation(s, c, m.f, p, m.cell); if (r.cheat) { cheat = r.cheat; s.foundations[fi].dirty = true; }
       break;
     }
     case 'N2W': {
@@ -109,8 +113,8 @@ export function apply(s: GameState, p: number, m: Move): Result {
     }
     case 'S2F': {
       const c = top(P.waste); if (c === undefined) return { ok: false, why: 'waste empty' };
-      const r = fCheck(c, m.f); if (!r.ok) return { ok: false, why: 'foundation refuses' };
-      P.waste.pop(); const fi = pushFoundation(s, c, m.f, p, m.at); if (r.cheat) { cheat = r.cheat; s.foundations[fi].dirty = true; }
+      const r = fCheck(c, m.f, m.cell); if (!r.ok) return { ok: false, why: 'foundation refuses' };
+      P.waste.pop(); const fi = pushFoundation(s, c, m.f, p, m.cell); if (r.cheat) { cheat = r.cheat; s.foundations[fi].dirty = true; }
       break;
     }
     case 'S2W': {
@@ -120,8 +124,8 @@ export function apply(s: GameState, p: number, m: Move): Result {
     }
     case 'W2F': {
       const c = top(P.work[m.w] ?? []); if (c === undefined) return { ok: false, why: 'work empty' };
-      const r = fCheck(c, m.f); if (!r.ok) return { ok: false, why: 'foundation refuses' };
-      P.work[m.w].pop(); const fi = pushFoundation(s, c, m.f, p, m.at); if (r.cheat) { cheat = r.cheat; s.foundations[fi].dirty = true; }
+      const r = fCheck(c, m.f, m.cell); if (!r.ok) return { ok: false, why: 'foundation refuses' };
+      P.work[m.w].pop(); const fi = pushFoundation(s, c, m.f, p, m.cell); if (r.cheat) { cheat = r.cheat; s.foundations[fi].dirty = true; }
       break;
     }
     case 'W2W': {
@@ -181,8 +185,28 @@ export function roundScores(s: GameState): number[] {
 export const isStuck = (s: GameState, p: number) => legalMoves(s, p).every(m => m.k === 'FLIP');
 export const playerSummary = (P: PlayerState) => `${P.name}: nerts=${P.nerts.length} stock=${P.stock.length} waste=${P.waste.length}`;
 
-/** circular table distance between seat i and ring position `at`, normalised to [0,1]. */
-export function ringDist(i: number, at: number, n: number): number {
-  if (n < 2) return 0;
-  const d = Math.abs(((i - at) % n + n) % n); return Math.min(d, n - d) / (n / 2);
+// ---- table geometry: foundations on an integer grid; square grows 1→9→25… ----
+/** Chebyshev radius of the current square (0 until the centre is taken). */
+export function gridRadius(s: GameState): number {
+  let r = 0; for (const f of s.foundations) r = Math.max(r, Math.abs(f.cx), Math.abs(f.cy)); return r;
+}
+export function cellTaken(s: GameState, x: number, y: number): boolean { return s.foundations.some(f => f.cx === x && f.cy === y); }
+/** Empty cells inside the current square; if it's full, the next ring. */
+export function allowedCells(s: GameState): [number, number][] {
+  const R = gridRadius(s);
+  const ring = (r: number) => { const out: [number, number][] = []; for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) if (!cellTaken(s, x, y)) out.push([x, y]); return out; };
+  const inner = ring(R); return inner.length ? inner : ring(R + 1);
+}
+/** Seat i of n sits at angle θ around the square, seat 0 at the bottom (+y is "toward seat 0"). */
+export function seatAngle(i: number, n: number): number { return Math.PI / 2 + (2 * Math.PI * i) / n; }
+export function seatPoint(i: number, n: number, R: number): [number, number] { const a = seatAngle(i, n), d = R + 2; return [Math.cos(a) * d, Math.sin(a) * d]; }
+/** Seat→cell distance normalised so the far edge of the square ≈ 1. */
+export function cellDist(i: number, n: number, R: number, x: number, y: number): number {
+  const [sx, sy] = seatPoint(i, n, R); return Math.hypot(x - sx, y - sy) / (2 * R + 4);
+}
+export function nearestCell(s: GameState, p: number): [number, number] {
+  const n = s.players.length, R = gridRadius(s);
+  let best: [number, number] = [0, 0], bd = Infinity;
+  for (const c of allowedCells(s)) { const d = cellDist(p, n, R, c[0], c[1]); if (d < bd) { bd = d; best = c; } }
+  return best;
 }

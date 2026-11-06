@@ -1,7 +1,7 @@
 import type { BotEvent } from '../bots/bot.ts';
 import { PRESETS } from '../bots/profile.ts';
 import { type Card, isRed, rankOf, RANKS, str, SUITS, suitOf } from '../engine/cards.ts';
-import { canFoundation, canWork } from '../engine/rules.ts';
+import { allowedCells, canFoundation, canWork, seatAngle } from '../engine/rules.ts';
 import type { Move } from '../engine/state.ts';
 import type { GameView } from '../server/protocol.ts';
 import { LocalSession, RemoteSession, type RoundInfo, type Session } from './session.ts';
@@ -75,17 +75,28 @@ function render() {
     <button data-a="setup">⚙</button>
   </header>`;
 
-  const found = `<section id="found"><span class="lbl" data-a="autof" title="auto-play selected card up">▲</span>
-    ${v.foundations.map((f, i) => { const t = f.cards.at(-1)!; return cardHtml(t, `${hotF(i) ? 'hot' : ''} ${f.cards.length === 13 ? 'dim' : ''} ${inspect === i ? 'sel' : ''}`, `data-f="${i}"`, `<span class="cnt">${f.cards.length}</span>`); }).join('')}
-    ${emptyHtml('A', hotF(-1) ? 'hot' : '', 'data-f="-1"')}
-    ${inspect !== null && v.foundations[inspect] ? `<div style="display:flex;gap:2px;align-items:center;flex-basis:100%;--cw:26px;--ch:34px">${v.foundations[inspect].cards.map(c => cardHtml(c, '', '', '')).join('')}<button data-a="challenge" data-f="${inspect}" class="warn">challenge</button><button data-a="uninspect">×</button></div>` : ''}
+  // foundation grid, rotated by quarter turns so `me` sits at the bottom
+  const n = v.players.length, kq = ((Math.round((me * 4) / n) % 4) + 4) % 4;
+  const rot = (x: number, y: number): [number, number] => { for (let k = 0; k < kq; k++) [x, y] = [y, -x]; return [x, y]; };
+  const allowed = allowedCells(v as any);
+  let Rd = 0; for (const f of v.foundations) Rd = Math.max(Rd, Math.abs(f.cx), Math.abs(f.cy)); for (const c of allowed) Rd = Math.max(Rd, Math.abs(c[0]), Math.abs(c[1]));
+  const side = 2 * Rd + 1; const cells: string[] = new Array(side * side).fill('');
+  const idx = (x: number, y: number) => { const [rx, ry] = rot(x, y); return (ry + Rd) * side + (rx + Rd); };
+  const aceSel = selC !== undefined && rankOf(selC) === 1;
+  for (const c of allowed) cells[idx(c[0], c[1])] = emptyHtml(aceSel ? 'A' : '', aceSel ? 'hot' : 'dim', `data-f="-1" data-cx="${c[0]}" data-cy="${c[1]}"`);
+  v.foundations.forEach((f, i) => { const t = f.cards.at(-1)!; cells[idx(f.cx, f.cy)] = cardHtml(t, `${hotF(i) ? 'hot' : ''} ${f.cards.length === 13 ? 'dim' : ''} ${inspect === i ? 'sel' : ''} ${f.dirty && spec ? 'dirty' : ''}`, `data-f="${i}"`, `<span class="cnt">${f.cards.length}</span>`); });
+  const fch = Math.max(34, Math.min(100, Math.floor((window.innerWidth >= 900 ? 300 : 150) / side))), fcw = Math.round(fch * 0.72);
+  const found = `<section id="found" style="--cw:${fcw}px;--ch:${fch}px;--fs:${Math.round(fch * 0.26)}px"><div class="grid" style="grid-template-columns:repeat(${side},var(--cw))">${cells.map(c => c || '<div class="cell"></div>').join('')}</div>
+    <div class="side"><span class="lbl" data-a="autof" title="auto-play selected card up">▲ auto</span>
+    ${inspect !== null && v.foundations[inspect] ? `<div style="display:flex;gap:2px;align-items:center;flex-wrap:wrap;--cw:26px;--ch:34px">${v.foundations[inspect].cards.map(c => cardHtml(c, '', '', '')).join('')}<button data-a="challenge" data-f="${inspect}" class="warn">challenge</button><button data-a="uninspect">×</button></div>` : ''}</div>
   </section>`;
 
-  const opps = `<section id="opps">${v.players.map((p, i) => i === me ? '' : `<div class="opp"><span class="nm" style="color:${deckColor(i)}">${esc(p.name)}</span>
+  const oppOrder = v.players.map((_, i) => i).filter(i => i !== me).sort((a, b) => { const sx = (i: number) => rot(Math.cos(seatAngle(i, n)), Math.sin(seatAngle(i, n)))[0]; return sx(a) - sx(b); });
+  const opps = `<section id="opps">${oppOrder.map(i => { const p = v.players[i]; return `<div class="opp"><span class="nm" style="color:${deckColor(i)}">${esc(p.name)}</span>
       ${p.nerts.length ? cardHtml(p.nerts.at(-1)!, '', '', `<span class="cnt">${p.nertsCount}</span>`) : emptyHtml(p.calledNerts ? 'N!' : '0')}
-      <span class="piles">${p.work.map(w => w.length ? `<div class="fan">${w.slice(-3).map((c, j) => cardHtml(c, '', `style="--dc:${deckColor(i)};--i:${j};top:${j * 7}px;z-index:${j}"`)).join('')}${w.length > 1 ? `<span class="cnt" style="position:absolute;right:-2px;top:-6px;font-size:9px;background:#0b0e11;padding:0 2px">${w.length}</span>` : ''}</div>` : emptyHtml('')).join('')}</span>
+      <span class="piles" style="height:calc(${Math.max(1, ...p.work.map(w => w.length)) - 1} * var(--fy) + var(--ch))">${p.work.map(w => w.length ? `<div class="fan">${w.map((c, j) => cardHtml(c, '', `style="--dc:${deckColor(i)};--i:${j};top:calc(${j} * var(--fy));z-index:${j}"`)).join('')}</div>` : emptyHtml('')).join('')}</span>
       <span class="dim">│</span>${p.waste.length ? cardHtml(p.waste.at(-1)!) : emptyHtml('')}<span class="n dim">${p.stockCount}</span>
-    </div>`).join('')}</section>`;
+    </div>`; }).join('')}</section>`;
 
   const nertsTop = P.nerts.at(-1);
   const myWork = P.work.map((w, i) => `<div class="fanv" data-w="${i}" style="height:calc(${Math.max(1, w.length) - 1} * var(--fy, 18px) + var(--ch))">
@@ -112,7 +123,7 @@ function render() {
     <table><tr><th>name</th><th class="n">round</th><th class="n">total</th></tr>${v.players.map((p, i) => `<tr style="color:${deckColor(i)}"><td>${esc(p.name)}</td><td class="n">${round!.roundScores[i]}</td><td class="n">${round!.totals[i]}</td></tr>`).join('')}</table>
     ${round.gameOver ? '<b class="ok">game over</b>' : ''} ${sess.host ? '<button data-a="next">next round</button>' : '<span class="dim">waiting for host</span>'}</div></div>` : '';
 
-  app.innerHTML = `<div id="table">${header}${found}${opps}${meSec}</div>${footer}${roundOv}`;
+  app.innerHTML = `<div id="table">${header}${opps}${found}${meSec}</div>${footer}${roundOv}`;
   if (!tickTimer) tickTimer = setTimeout(tick, 1000);
 }
 function tick() { tickTimer = null; const el = document.getElementById('clk'); if (el && sess.view && !sess.view.over) { el.textContent = fmtT(sess.now()); tickTimer = setTimeout(tick, 1000); } }
@@ -152,11 +163,11 @@ app.addEventListener('click', ev => {
   if (a === 'nerts') { sess.move({ k: 'NERTS' }); return; }
   if (a === 'challenge') { sess.move({ k: 'CHALLENGE', f: +el.dataset.f! }); inspect = null; render(); return; }
   if (a === 'uninspect') { inspect = null; render(); return; }
-  if (a === 'autof') { const c = selectedCard(v); if (c === undefined) return; const f = rankOf(c) === 1 ? -1 : v.foundations.findIndex(F => canFoundation(c, F)); if (f === -2 || f === undefined) return; if (rankOf(c) !== 1 && f < 0) return; play({ f }); return; }
+  if (a === 'autof') { const c = selectedCard(v); if (c === undefined) return; const f = rankOf(c) === 1 ? -1 : v.foundations.findIndex(F => canFoundation(c, F)); if (f === -2 || f === undefined) return; if (rankOf(c) !== 1 && f < 0) return; play({ f }); return; }  // ace: engine picks nearest allowed cell
   if (el.dataset.src) { const s = el.dataset.src as 'N' | 'S'; sel = sel?.src === s ? null : { src: s }; render(); return; }
   if (el.dataset.f !== undefined) {
     const f = +el.dataset.f;
-    if (sel) { play({ f }); return; }
+    if (sel) { play(f === -1 && el.dataset.cx !== undefined ? { f, cell: [+el.dataset.cx, +el.dataset.cy!] } : { f }); return; }
     if (v.rules.houseRules && f >= 0) { inspect = inspect === f ? null : f; render(); }
     return;
   }
@@ -169,10 +180,10 @@ app.addEventListener('click', ev => {
 });
 app.addEventListener('contextmenu', ev => ev.preventDefault());
 
-function play(t: { f: number } | { w: number }) {
+function play(t: { f: number; cell?: [number, number] } | { w: number }) {
   if (!sel) return;
   let m: Move;
-  if ('f' in t) m = sel.src === 'N' ? { k: 'N2F', f: t.f } : sel.src === 'S' ? { k: 'S2F', f: t.f } : { k: 'W2F', w: sel.w, f: t.f };
+  if ('f' in t) m = sel.src === 'N' ? { k: 'N2F', f: t.f, cell: t.cell } : sel.src === 'S' ? { k: 'S2F', f: t.f, cell: t.cell } : { k: 'W2F', w: sel.w, f: t.f, cell: t.cell };
   else m = sel.src === 'N' ? { k: 'N2W', w: t.w } : sel.src === 'S' ? { k: 'S2W', w: t.w } : { k: 'W2W', from: sel.w, n: sel.n, to: t.w };
   sel = null;
   sess.move(m);

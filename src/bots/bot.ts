@@ -1,6 +1,6 @@
 import { type Card, isRed, rankOf, suitOf } from '../engine/cards.ts';
 import type { GameState, Move } from '../engine/state.ts';
-import { canFoundationCheat, ringDist, type Result } from '../engine/rules.ts';
+import { allowedCells, canFoundationCheat, cellDist, gridRadius, type Result } from '../engine/rules.ts';
 import type { BotProfile, Region } from './profile.ts';
 
 export interface BotEvent {
@@ -46,12 +46,12 @@ export class Bot {
 
   private jit(env: BotEnv, ms: number) { return ms * (1 + this.prof.jitter * (2 * env.rand() - 1)); }
   private cps(now: number) { return this.prof.cps * Math.exp(this.focus) * (now < this.tiltUntil ? this.prof.tiltMult : 1); }
-  private dist(env: BotEnv, at: number) { return ringDist(this.p, at, env.state.players.length); }
+  private dist(env: BotEnv, x: number, y: number) { return cellDist(this.p, env.state.players.length, gridRadius(env.state), x, y); }
   private cost(env: BotEnv, now: number, items: number) { return this.jit(env, (1000 * Math.max(1, items)) / this.cps(now)); }
 
   /** Refresh foundation belief from truth (this *is* "looking at the foundations"). */
   private look(env: BotEnv, now: number) {
-    this.belief = env.state.foundations.map(f => ({ suit: f.suit, top: this.readRank(env, top(f.cards)!, f.mess + this.dist(env, f.at) * this.prof.farsight / Math.max(1e-6, this.prof.eyestrain)), len: f.cards.length }));
+    this.belief = env.state.foundations.map(f => ({ suit: f.suit, top: this.readRank(env, top(f.cards)!, f.mess + this.dist(env, f.cx, f.cy) * this.prof.farsight / Math.max(1e-6, this.prof.eyestrain)), len: f.cards.length }));
     this.beliefAt = now;
   }
   private readRank(env: BotEnv, c: Card, mess = 0) {
@@ -60,13 +60,18 @@ export class Bot {
     if (p > 0 && env.rand() < p) return Math.max(1, Math.min(13, r + (env.rand() < 0.5 ? -1 : 1)));
     return r;
   }
-  /** Where to put a new ace pile: near me, and (with prob spite) pushed away from the current leader. */
-  private placeAt(env: BotEnv): number {
-    const n = env.state.players.length; if (n < 3 || env.rand() >= this.prof.spite) return this.p;
+  /** Where to put a new ace pile: nearest allowed cell to me; with prob spite, trade nearness for distance from the leader. */
+  private placeAt(env: BotEnv): [number, number] {
+    const st = env.state, n = st.players.length, R = gridRadius(st);
+    const spite = env.rand() < this.prof.spite ? 1 : 0;
     let lead = -1, best = Infinity;
-    env.state.players.forEach((P, i) => { if (i !== this.p && P.nerts.length < best) { best = P.nerts.length; lead = i; } });
-    const a = this.p + 0.5, b = this.p - 0.5;
-    return ringDist(lead, a, n) >= ringDist(lead, b, n) ? a : b;
+    st.players.forEach((P, i) => { if (i !== this.p && P.nerts.length < best) { best = P.nerts.length; lead = i; } });
+    let bc: [number, number] = [0, 0], bs = -Infinity;
+    for (const c of allowedCells(st)) {
+      const sc = -cellDist(this.p, n, R, c[0], c[1]) + (spite && lead >= 0 ? cellDist(lead, n, R, c[0], c[1]) : 0);
+      if (sc > bs) { bs = sc; bc = c; }
+    }
+    return bc;
   }
   private fTarget(env: BotEnv, c: Card): number | undefined {
     const r = this.readRank(env, c);
@@ -205,7 +210,7 @@ export class Bot {
     this.scanIdx = (this.scanIdx + 1) % pr.scanOrder.length;
     const P = st.players[this.p];
     if (pr.drift) this.focus = Math.max(-0.8, Math.min(0.8, 0.97 * this.focus + pr.drift * 0.25 * (2 * env.rand() - 1)));
-    const items = region === 'found' ? 1 + st.foundations.reduce((a, f) => a + 1 + pr.reach * this.dist(env, f.at), 0) : region === 'work' ? P.work.length * 2 : 1;
+    const items = region === 'found' ? 1 + st.foundations.reduce((a, f) => a + 1 + pr.reach * this.dist(env, f.cx, f.cy), 0) : region === 'work' ? P.work.length * 2 : 1;
     const c = this.cost(env, now, items); this.n.scans++;
     if (region === 'found' || this.beliefAt < 0 || (pr.psychic && env.rand() < pr.psychic)) this.look(env, now);
     // suspicion: inspect a random pile
@@ -219,7 +224,7 @@ export class Bot {
       cands.sort((a, b) => b.score - a.score);
       const best = cands[0];
       const motor = best.m.k === 'FLIP' ? pr.flipMs : pr.motorMs;
-      if ('f' in best.m && best.m.f === -1 && best.m.k !== 'CHALLENGE') (best.m as { at?: number }).at = this.placeAt(env);
+      if ('f' in best.m && best.m.f === -1 && best.m.k !== 'CHALLENGE') (best.m as { cell?: [number, number] }).cell = this.placeAt(env);
       this.pending = { m: best.m, at: now + c + this.jit(env, motor), card: best.card, f: best.f };
       return c;
     }

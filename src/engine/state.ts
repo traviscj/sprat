@@ -34,7 +34,7 @@ export interface Foundation {
   cards: Card[];        // bottom(A)..top
   suit: number;
   dirty: boolean;       // contains a cheat (a rank gap) — only used in houseRules
-  at: number;           // ring position on the table, in seat units (placer's seat by default)
+  cx: number; cy: number; // grid cell on the table (integer, origin = table centre)
   owner: number;        // who placed the ace
   mess: number;         // 0..1 legibility damage from whoever slammed last (bots read it with error)
 }
@@ -52,11 +52,11 @@ export interface GameState {
 }
 
 export type Move =
-  | { k: 'N2F'; f: number; at?: number }          // nerts top → foundation (f=-1 ⇒ new ace pile, placed at ring pos `at`)
+  | { k: 'N2F'; f: number; cell?: [number, number] } // nerts top → foundation (f=-1 ⇒ new ace pile at `cell`, default: nearest allowed to my seat)
   | { k: 'N2W'; w: number }                       // nerts top → work pile
-  | { k: 'W2F'; w: number; f: number; at?: number } // work top → foundation
+  | { k: 'W2F'; w: number; f: number; cell?: [number, number] } // work top → foundation
   | { k: 'W2W'; from: number; n: number; to: number } // run of n cards
-  | { k: 'S2F'; f: number; at?: number }          // waste top → foundation
+  | { k: 'S2F'; f: number; cell?: [number, number] } // waste top → foundation
   | { k: 'S2W'; w: number }                       // waste top → work
   | { k: 'FLIP'; n?: number }                     // flip stock→waste (n≠flipCount is a cheat under houseRules)
   | { k: 'NERTS' }                                // call it

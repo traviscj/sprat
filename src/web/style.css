@@ -27,15 +27,15 @@ section{padding:3px 0}
 .c .d{position:absolute;left:0;bottom:0;width:100%;height:3px;background:var(--dc);border-radius:0 0 3px 3px}
 .c.dirty{box-shadow:0 0 0 1px var(--warn) inset}
 /* foundations */
-#found{display:flex;flex-wrap:wrap;gap:4px;align-items:flex-start;min-height:calc(var(--ch) + 8px)}
+#found{display:flex;gap:8px;align-items:flex-start;justify-content:center}#found .grid{display:grid;gap:3px;grid-auto-rows:var(--ch)}#found .cell{width:var(--cw);height:var(--ch);border:1px dotted #1c2128;border-radius:3px}#found .side{display:flex;flex-direction:column;gap:3px;min-width:60px}#found .c.empty.dim{border-color:#2a3038}
 #found .c{cursor:pointer}
 /* opponents */
-#opps{display:flex;flex-direction:column;gap:2px}
+#opps{display:flex;flex-direction:row;flex-wrap:wrap;gap:2px 14px;justify-content:center}
 .opp{display:flex;gap:6px;align-items:center;--cw:26px;--ch:34px;font-size:11px}
 .opp .c{font-size:10px;padding:1px 2px}.opp .c .s{font-size:10px}
 .opp .nm{width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .opp .piles{display:flex;gap:3px}
-.opp .fan{position:relative;width:var(--cw);height:var(--ch)}
+.opp{--fy:11px;align-items:flex-start}.opp .fan{position:relative;width:var(--cw);height:100%}.opp .nm,.opp>.c,.opp>.n,.opp>.dim{align-self:flex-start}
 .opp .fan .c{position:absolute;left:0}
 /* me */
 #me{display:flex;gap:6px;align-items:flex-start;flex:1;min-height:0}
@@ -66,16 +66,16 @@ tr:nth-child(even){background:#ffffff08}
 @media (min-width:900px){
   #app{flex-direction:row;flex-wrap:nowrap}#table{flex:1 1 0;min-width:0;display:flex;flex-direction:column;overflow:auto}footer{flex:0 0 600px;max-height:100dvh;border-top:0;border-left:1px solid #222;padding-left:6px}
   /* three size tiers: my piles > foundations > opponents */
-  #me{--cw:96px;--ch:132px;--fy:44px;gap:16px}#work{gap:16px}#me .c{font-size:30px;padding:6px 8px}#me .c .s{font-size:34px}#me .c .cnt{font-size:12px}
-  #found{--cw:72px;--ch:100px;gap:8px}#found .c{font-size:22px;padding:4px 6px}#found .c .s{font-size:26px}#found .c .cnt{font-size:11px}
-  .opp{--cw:48px;--ch:66px;font-size:12px;gap:8px}.opp .c{font-size:16px;padding:2px 4px}.opp .c .s{font-size:17px}.opp .fan .c{top:calc(var(--i) * 12px)!important}.opp .nm{width:90px}
+  #me{--cw:88px;--ch:120px;--fy:40px;gap:14px}#work{gap:16px}#me .c{font-size:30px;padding:6px 8px}#me .c .s{font-size:34px}#me .c .cnt{font-size:12px}
+  #found{--cw:72px;--ch:100px;gap:8px}#found .c{font-size:var(--fs);padding:3px 5px}#found .c .s{font-size:calc(var(--fs) * 1.15)}#found .c .cnt{font-size:11px}
+  .opp{--cw:48px;--ch:66px;font-size:12px;gap:8px}.opp .c{font-size:16px;padding:2px 4px}.opp .c .s{font-size:17px}.opp{--fy:16px}.opp .nm{width:90px}
   .fanv .c{top:calc(var(--i) * var(--fy))!important}.fanh .c{left:calc(var(--i) * 26px)!important}.fanh{width:calc(var(--cw) + 52px)}
   #opps{gap:6px}.lbl{font-size:12px}header{font-size:13px}
 }
 @media (min-width:1600px){
   #me{--cw:124px;--ch:170px;--fy:56px}#me .c{font-size:38px}#me .c .s{font-size:44px}
-  #found{--cw:88px;--ch:122px}#found .c{font-size:28px}#found .c .s{font-size:32px}
-  .opp{--cw:58px;--ch:80px}.opp .c{font-size:19px}.opp .c .s{font-size:20px}.opp .fan .c{top:calc(var(--i) * 15px)!important}
+  
+  .opp{--cw:58px;--ch:80px}.opp .c{font-size:19px}.opp .c .s{font-size:20px}.opp{--fy:20px}
   footer{flex-basis:680px}
 }
 header .pl.pov{text-decoration:underline}header .pl.clk{cursor:pointer}
