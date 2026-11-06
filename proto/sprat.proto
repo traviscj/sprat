@@ -1,0 +1,72 @@
+syntax = "proto3";
+package sprat.v1;
+
+// Schema of record for the wire protocol. v1 transports these as JSON over WebSocket
+// (field names identical, `oneof` flattened to a `t`/`k` discriminator). `buf generate`
+// → protobuf-es for TS and whatever the TUI/mobile clients want; see DESIGN.md.
+
+// Card = deck*52 + suit*13 + (rank-1). suits ♥♦♣♠ = 0..3; ranks A..K = 1..13.
+
+message Rules {
+  uint32 nerts_size = 1;           // 13
+  uint32 work_piles = 2;           // 4
+  uint32 flip_count = 3;           // 3
+  uint32 nerts_penalty = 4;        // 2
+  bool   house_rules = 5;          // grandma mode: skips, miscounts, challenges
+  uint32 challenge_penalty = 6;
+  uint32 false_challenge_penalty = 7;
+  uint32 target_score = 8;         // 100
+}
+
+message Move {
+  enum Kind { N2F = 0; N2W = 1; W2F = 2; W2W = 3; S2F = 4; S2W = 5; FLIP = 6; NERTS = 7; CHALLENGE = 8; }
+  Kind   k    = 1;
+  sint32 f    = 2;   // foundation idx; -1 = new ace pile
+  uint32 w    = 3;   // work pile (target or source for W2F)
+  uint32 from = 4;   // W2W
+  uint32 n    = 5;   // W2W run length / FLIP count
+  uint32 to   = 6;   // W2W
+}
+
+message Foundation { repeated uint32 cards = 1; uint32 suit = 2; bool dirty = 3; }
+
+// Redacted per recipient: other players' nerts → top card only, stock → empty, waste → top 3.
+message PlayerView {
+  string id = 1; string name = 2; bool bot = 3;
+  repeated uint32 nerts = 4; uint32 nerts_count = 5;
+  repeated WorkPile work = 6;
+  repeated uint32 stock = 7; uint32 stock_count = 8;
+  repeated uint32 waste = 9; uint32 waste_count = 10;
+  bool called_nerts = 11; sint32 penalty = 12; sint32 score = 13;
+}
+message WorkPile { repeated uint32 cards = 1; }
+
+message GameView {
+  uint32 seed = 1; uint32 round = 2; Rules rules = 3;
+  repeated PlayerView players = 4; repeated Foundation foundations = 5;
+  bool over = 6; sint32 caller = 7; uint64 t_ms = 8; uint64 seq = 9;
+}
+
+message Result { bool ok = 1; string why = 2; string cheat = 3; bool round_over = 4; }
+
+// Telemetry used by the stats panel and the calibration recorder.
+message BotEvent {
+  uint64 t_ms = 1; uint32 p = 2; string k = 3;   // move|reject|beaten|stale|fixate|tilt|cheat|challenge|nerts
+  Move move = 4; uint32 card = 5; sint32 f = 6; string why = 7;
+}
+
+// ---- client → server ----
+message Join    { string room = 1; string name = 2; }
+message AddBot  { string preset = 1; map<string,double> overrides = 2; }
+message Start   { Rules rules = 1; uint32 seed = 2; }
+message DoMove  { Move m = 1; uint64 client_ms = 2; }
+message Hint    { uint32 to = 1; Move m = 2; }        // roadmap: point out a play to another player
+message ClientMsg { oneof msg { Join join = 1; AddBot add_bot = 2; Start start = 3; DoMove move = 4; Hint hint = 5; } }
+
+// ---- server → client ----
+message Hello   { uint32 you = 1; string room = 2; }
+message Seat    { string name = 1; bool bot = 2; string preset = 3; bool connected = 4; }
+message Lobby   { repeated Seat seats = 1; uint32 host = 2; }
+message Applied { uint32 p = 1; Move m = 2; Result r = 3; uint64 seq = 4; }
+message RoundEnd{ repeated sint32 round_scores = 1; repeated sint32 totals = 2; sint32 caller = 3; bool game_over = 4; }
+message ServerMsg { oneof msg { Hello hello = 1; Lobby lobby = 2; GameView state = 3; Applied applied = 4; BotEvent event = 5; RoundEnd round = 6; string error = 7; } }
