@@ -18,7 +18,7 @@ section{padding:3px 0}
 /* cards */
 .c{width:var(--cw);height:var(--ch);border-radius:3px;background:#f3f4f6;color:#111;display:flex;flex-direction:column;justify-content:space-between;padding:2px 3px;font-weight:700;font-size:13px;line-height:1;position:relative;flex:none;border:1px solid #8886}
 .c.r{color:#c0182d}
-.c .s{align-self:flex-end;font-size:14px}
+.c .s{align-self:flex-end;font-size:14px}.c small{font-size:.7em;margin-left:1px}
 .c.back{background:repeating-linear-gradient(45deg,var(--dc) 0 3px,#0000 3px 6px),#1c2128;border-color:var(--dc)}
 .c.empty{background:#0000;border:1px dashed #333;color:var(--dim);font-weight:400;font-size:10px;justify-content:center;align-items:center}
 .c.sel{outline:2px solid var(--sel);outline-offset:1px;z-index:5}
@@ -70,7 +70,7 @@ tr:nth-child(even){background:#ffffff08}
   #me{--cw:88px;--ch:120px;--fy:40px;gap:14px}#work{gap:16px}#me .c{font-size:30px;padding:6px 8px}#me .c .s{font-size:34px}#me .c .cnt{font-size:12px}
   #found{--cw:72px;--ch:100px;gap:8px}#found .c{font-size:var(--fs);padding:3px 5px}#found .c .s{font-size:calc(var(--fs) * 1.15)}#found .c .cnt{font-size:11px}
   .opp{--cw:48px;--ch:66px;font-size:12px;gap:8px}.opp .c{font-size:16px;padding:2px 4px}.opp .c .s{font-size:17px}.opp{--fy:16px}.opp .nm{width:90px}
-  .fanv .c{top:calc(var(--i) * var(--fy))!important}.fanh .c{left:calc(var(--i) * 26px)!important}.fanh{width:calc(var(--cw) + 52px)}
+  #me{--fx:26px}.fanh{width:calc(var(--cw) + 52px)}
   #opps{gap:6px}.lbl{font-size:12px}header{font-size:13px}
 }
 @media (min-width:1600px){
