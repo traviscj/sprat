@@ -38,7 +38,7 @@ section{padding:3px 0}
 .opp{--fy:11px;align-items:flex-start}.opp .fan{position:relative;width:var(--cw);height:100%}.opp .nm,.opp>.c,.opp>.n,.opp>.dim{align-self:flex-start}
 .opp .fan .c{position:absolute;left:0}
 /* me */
-#me{display:flex;gap:6px;align-items:flex-start;flex:1;min-height:0;justify-content:center}
+#me{display:flex;gap:6px;align-items:flex-start;flex:1;min-height:0;justify-content:safe center;overflow-x:auto}
 #me .col{display:flex;flex-direction:column;align-items:center;gap:2px}
 .pile{position:relative;width:var(--cw);min-height:var(--ch)}
 .pile .c{position:absolute;left:0;cursor:pointer}
