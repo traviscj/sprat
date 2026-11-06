@@ -9,11 +9,12 @@ export interface Rules {
   challengePenalty: number; // points lost by cheater when caught
   falseChallengePenalty: number; // points lost by challenger when pile is clean
   targetScore: number;    // 100
+  stallRule: 'end' | 'rotate'; // rotate: everyone moves 1 stock card top→bottom and play resumes
 }
 
 export const DEFAULT_RULES: Rules = {
   nertsSize: 13, workPiles: 4, flipCount: 3, nertsPenalty: 2,
-  houseRules: false, challengePenalty: 5, falseChallengePenalty: 2, targetScore: 100,
+  houseRules: false, challengePenalty: 5, falseChallengePenalty: 2, targetScore: 100, stallRule: 'rotate',
 };
 
 export interface PlayerState {
@@ -33,6 +34,8 @@ export interface Foundation {
   cards: Card[];        // bottom(A)..top
   suit: number;
   dirty: boolean;       // contains a cheat (a rank gap) — only used in houseRules
+  at: number;           // ring position on the table, in seat units (placer's seat by default)
+  owner: number;        // who placed the ace
   mess: number;         // 0..1 legibility damage from whoever slammed last (bots read it with error)
 }
 
@@ -49,15 +52,16 @@ export interface GameState {
 }
 
 export type Move =
-  | { k: 'N2F'; f: number }                       // nerts top → foundation (f=-1 ⇒ new ace pile)
+  | { k: 'N2F'; f: number; at?: number }          // nerts top → foundation (f=-1 ⇒ new ace pile, placed at ring pos `at`)
   | { k: 'N2W'; w: number }                       // nerts top → work pile
-  | { k: 'W2F'; w: number; f: number }            // work top → foundation
+  | { k: 'W2F'; w: number; f: number; at?: number } // work top → foundation
   | { k: 'W2W'; from: number; n: number; to: number } // run of n cards
-  | { k: 'S2F'; f: number }                       // waste top → foundation
+  | { k: 'S2F'; f: number; at?: number }          // waste top → foundation
   | { k: 'S2W'; w: number }                       // waste top → work
   | { k: 'FLIP'; n?: number }                     // flip stock→waste (n≠flipCount is a cheat under houseRules)
   | { k: 'NERTS' }                                // call it
-  | { k: 'CHALLENGE'; f: number };                // inspect+challenge a foundation pile
+  | { k: 'CHALLENGE'; f: number }                 // inspect+challenge a foundation pile
+  | { k: 'ROTATE' };                              // stall resolution: each player's stock top → bottom (driver-issued)
 
 export function deal(seed: number, players: Pick<PlayerState, 'id' | 'name' | 'bot'>[], rules = DEFAULT_RULES, round = 0, prevScores?: number[]): GameState {
   const rand = rng(seed + round * 7919);

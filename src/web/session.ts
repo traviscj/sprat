@@ -67,9 +67,9 @@ export class RemoteSession implements Session {
   kind = 'remote' as const; me = -1; view: GameView | null = null; seats: SeatInfo[] = []; host = false;
   private ws: WebSocket; private t0 = 0; private serverNow = 0;
   onChange = noop; onEvent: (e: BotEvent) => void = noop; onRound: (r: RoundInfo) => void = noop; onError = noop;
-  constructor(url: string, room: string, name: string) {
+  constructor(url: string, room: string, name: string, spectate = false) {
     this.ws = new WebSocket(url);
-    this.ws.onopen = () => this.send({ t: 'join', room, name });
+    this.ws.onopen = () => this.send({ t: 'join', room, name, spectate });
     this.ws.onclose = () => this.onError('disconnected');
     this.ws.onmessage = ev => {
       const m: ServerMsg = JSON.parse(ev.data);

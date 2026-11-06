@@ -30,6 +30,10 @@ export interface BotProfile {
   distract: number;       // my susceptibility to others' slams (0..1); an interrupt costs stunMs and refreshes belief
   stunMs: number;         // time lost per interrupt
   eyestrain: number;      // multiplier on pile mess → my misread prob
+  reach: number;          // extra scan cost per unit table distance (far piles are slower to read)
+  farsight: number;       // misread prob added per unit distance (rotated / far cards)
+  spite: number;          // prob. I place a new ace pile away from the current leader rather than just near me
+  drift: number;          // focus ebb/flow: AR(1) noise on log(cps). 0 = constant attention
 }
 
 const base: BotProfile = {
@@ -39,6 +43,7 @@ const base: BotProfile = {
   fixation: 0.3, fixateMaxMs: 4000, tiltMult: 0.6, tiltMs: 1500, rescan: true,
   larceny: 0, suspicion: 0, miscount: 0,
   slam: 0.4, messy: 0.2, distract: 0.5, stunMs: 350, eyestrain: 0.15,
+  reach: 0.8, farsight: 0.04, spite: 0.3, drift: 0.25,
 };
 
 export const PRESETS: Record<string, BotProfile> = {
@@ -61,8 +66,10 @@ export const PRESETS: Record<string, BotProfile> = {
   slammer: { ...base, name: 'slammer', slam: 1, messy: 0.8, distract: 0.1, cps: 7, motorMs: 450 },
   // Sneak: silent placements, nobody sees it coming; grandma's apprentice.
   sneak: { ...base, name: 'sneak', slam: 0.05, messy: 0, distract: 0.6, larceny: 0.2 },
+  // Tunnel vision: ignores the far side of the table entirely, big focus swings.
+  tunnel: { ...base, name: 'tunnel', reach: 2.5, farsight: 0.12, spite: 0.8, drift: 0.5 },
   // Omniscient speed demon — the thing we're handicapping *away* from. Baseline for strategy eval.
-  psychic: { ...base, name: 'psychic', cps: 40, motorMs: 120, flipMs: 150, jitter: 0.05, psychic: 1, tiltMult: 1, fixation: 0 },
+  psychic: { ...base, name: 'psychic', cps: 40, motorMs: 120, flipMs: 150, jitter: 0.05, psychic: 1, tiltMult: 1, fixation: 0, reach: 0, farsight: 0, drift: 0 },
 };
 
 export const profile = (name: string, over: Partial<BotProfile> = {}): BotProfile => ({ ...(PRESETS[name] ?? base), ...over, name: over.name ?? name });

@@ -17,7 +17,7 @@ export interface GameView {
 export interface SeatInfo { name: string; bot: boolean; preset?: string; connected: boolean }
 
 export type ClientMsg =
-  | { t: 'join'; room: string; name: string }
+  | { t: 'join'; room: string; name: string; spectate?: boolean }
   | { t: 'addBot'; preset: string; overrides?: Record<string, number> }
   | { t: 'removeBot'; seat: number }
   | { t: 'start'; rules?: Partial<Rules>; seed?: number }

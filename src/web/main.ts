@@ -11,7 +11,7 @@ const q = new URLSearchParams(location.search);
 const name = q.get('name') || localStorage.getItem('sprat.name') || 'you';
 localStorage.setItem('sprat.name', name);
 const wsUrl = q.get('ws');
-const sess: Session = wsUrl ? new RemoteSession(wsUrl, q.get('room') || 'lobby', name) : new LocalSession(name);
+const sess: Session = wsUrl ? new RemoteSession(wsUrl, q.get('room') || 'lobby', name, q.get('spectate') === '1') : new LocalSession(name);
 const app = document.getElementById('app')!;
 
 type Sel = { src: 'N' } | { src: 'S' } | { src: 'W'; w: number; n: number } | null;
@@ -58,7 +58,7 @@ function render() {
   const v = sess.view;
   if (!v) { app.innerHTML = setupHtml(); return; }
   const me = sess.me;
-  const P = v.players[me];
+  const P = v.players[me] ?? { nerts: [], nertsCount: 0, work: [], stock: [], stockCount: 0, waste: [], wasteCount: 0, calledNerts: false };
   const selC = selectedCard(v);
   const hotF = (f: number) => selC !== undefined && (f === -1 ? rankOf(selC) === 1 : canFoundation(selC, v.foundations[f]));
   const hotW = (w: number) => selC !== undefined && !(sel?.src === 'W' && sel.w === w) && canWork(selC, P.work[w]);
@@ -69,7 +69,7 @@ function render() {
     ${v.rules.houseRules ? '<span class="warn">house</span>' : ''}
     ${err ? `<span class="bad">${esc(err)}</span>` : ''}
     <span style="flex:1"></span>
-    ${sess.host && v.over ? '<button data-a="next">next round</button>' : ''}
+    ${sess.host && v.over ? '<button data-a="next">next round</button>' : ''}${sess.kind === 'remote' ? `<span class="dim">${esc(q.get('room') || 'lobby')}${sess.me < 0 ? ' 👁' : ''}</span>` : ''}
     <button data-a="setup">⚙</button>
   </header>`;
 
@@ -110,7 +110,7 @@ function render() {
     <table><tr><th>name</th><th class="n">round</th><th class="n">total</th></tr>${v.players.map((p, i) => `<tr style="color:${deckColor(i)}"><td>${esc(p.name)}</td><td class="n">${round!.roundScores[i]}</td><td class="n">${round!.totals[i]}</td></tr>`).join('')}</table>
     ${round.gameOver ? '<b class="ok">game over</b>' : ''} ${sess.host ? '<button data-a="next">next round</button>' : '<span class="dim">waiting for host</span>'}</div></div>` : '';
 
-  app.innerHTML = `<div id="table">${header}${found}${opps}${meSec}</div>${footer}${roundOv}`;
+  app.innerHTML = `<div id="table">${header}${found}${opps}${me >= 0 ? meSec : '<section class="dim">spectating</section>'}</div>${footer}${roundOv}`;
   if (!tickTimer) tickTimer = setTimeout(tick, 1000);
 }
 function tick() { tickTimer = null; const el = document.getElementById('clk'); if (el && sess.view && !sess.view.over) { el.textContent = fmtT(sess.now()); tickTimer = setTimeout(tick, 1000); } }
@@ -142,7 +142,7 @@ app.addEventListener('click', ev => {
   if (a === 'start') { if (sess.seats.length < 2) sess.addBot('steady'); if (sess.seats.length < 3) sess.addBot('twitchy'); sess.start({ houseRules: (document.getElementById('house') as HTMLInputElement)?.checked }); return; }
   if (a === 'next') { round = null; sess.next(); return; }
   if (a === 'closeround') { if ((ev.target as HTMLElement).classList.contains('ov')) { round = null; render(); } return; }
-  if (!v || v.over) return;
+  if (!v || v.over || sess.me < 0) return;
   if (a === 'flip') { sel = null; sess.move({ k: 'FLIP' }); return; }
   if (a === 'flipn') { sel = null; sess.move({ k: 'FLIP', n: +el.dataset.n! }); return; }
   if (a === 'nerts') { sess.move({ k: 'NERTS' }); return; }

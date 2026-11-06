@@ -22,6 +22,7 @@ export class Driver {
   onApplied?: (p: number, m: Move, r: Result) => void;
   onEvent?: (e: BotEvent) => void;
   private wall: (() => number) | null = null;
+  rotations = 0;
   onRoundOver?: (scores: number[]) => void;
 
   seats: Seat[]; rules: Rules; seed: number;
@@ -63,9 +64,17 @@ export class Driver {
         for (const [i, b] of this.bots) if (i !== p && b.notice(this.env, this.now, sal)) this.env.emit!({ t: this.now, p: i, k: 'notice', why: this.state.players[p].name });
         if (r.cheat && !this.bots.has(p)) { const fi = m.f === -1 ? this.state.foundations.length - 1 : m.f; this.state.foundations[fi].mess = Math.min(1, this.state.foundations[fi].mess + 0.3); }
       }
-      if (m.k === 'FLIP') this.flipsSince[p] = (this.flipsSince[p] ?? 0) + 1; else this.flipsSince = [];
+      if (m.k === 'FLIP') this.flipsSince[p] = (this.flipsSince[p] ?? 0) + 1; else if (m.k !== 'ROTATE') { this.flipsSince = []; this.rotations = 0; }
       this.onApplied?.(p, m, r);
-      if (r.roundOver || this.stalled()) this.finish();
+      if (r.roundOver) this.finish();
+      else if (this.stalled()) {
+        if (this.rules.stallRule === 'rotate' && this.rotations < 3) {
+          this.rotations++; this.flipsSince = [];
+          apply(this.state, 0, { k: 'ROTATE' });
+          this.env.emit!({ t: this.now, p: 0, k: 'rotate', why: `stall #${this.rotations}` });
+          this.onApplied?.(0, { k: 'ROTATE' }, { ok: true });
+        } else this.finish();
+      }
     }
     return r;
   }

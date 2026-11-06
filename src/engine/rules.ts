@@ -76,8 +76,8 @@ export function legalMoves(s: GameState, p: number): Move[] {
   return out;
 }
 
-function pushFoundation(s: GameState, c: Card, f: number): number {
-  if (f === -1) { s.foundations.push({ cards: [c], suit: suitOf(c), dirty: false, mess: 0 }); return s.foundations.length - 1; }
+function pushFoundation(s: GameState, c: Card, f: number, p: number, at?: number): number {
+  if (f === -1) { s.foundations.push({ cards: [c], suit: suitOf(c), dirty: false, mess: 0, at: at ?? p, owner: p }); return s.foundations.length - 1; }
   s.foundations[f].cards.push(c);
   return f;
 }
@@ -99,7 +99,7 @@ export function apply(s: GameState, p: number, m: Move): Result {
     case 'N2F': {
       const c = top(P.nerts); if (c === undefined) return { ok: false, why: 'nerts empty' };
       const r = fCheck(c, m.f); if (!r.ok) return { ok: false, why: 'foundation refuses' };
-      P.nerts.pop(); const fi = pushFoundation(s, c, m.f); if (r.cheat) { cheat = r.cheat; s.foundations[fi].dirty = true; }
+      P.nerts.pop(); const fi = pushFoundation(s, c, m.f, p, m.at); if (r.cheat) { cheat = r.cheat; s.foundations[fi].dirty = true; }
       break;
     }
     case 'N2W': {
@@ -110,7 +110,7 @@ export function apply(s: GameState, p: number, m: Move): Result {
     case 'S2F': {
       const c = top(P.waste); if (c === undefined) return { ok: false, why: 'waste empty' };
       const r = fCheck(c, m.f); if (!r.ok) return { ok: false, why: 'foundation refuses' };
-      P.waste.pop(); const fi = pushFoundation(s, c, m.f); if (r.cheat) { cheat = r.cheat; s.foundations[fi].dirty = true; }
+      P.waste.pop(); const fi = pushFoundation(s, c, m.f, p, m.at); if (r.cheat) { cheat = r.cheat; s.foundations[fi].dirty = true; }
       break;
     }
     case 'S2W': {
@@ -121,7 +121,7 @@ export function apply(s: GameState, p: number, m: Move): Result {
     case 'W2F': {
       const c = top(P.work[m.w] ?? []); if (c === undefined) return { ok: false, why: 'work empty' };
       const r = fCheck(c, m.f); if (!r.ok) return { ok: false, why: 'foundation refuses' };
-      P.work[m.w].pop(); const fi = pushFoundation(s, c, m.f); if (r.cheat) { cheat = r.cheat; s.foundations[fi].dirty = true; }
+      P.work[m.w].pop(); const fi = pushFoundation(s, c, m.f, p, m.at); if (r.cheat) { cheat = r.cheat; s.foundations[fi].dirty = true; }
       break;
     }
     case 'W2W': {
@@ -147,6 +147,10 @@ export function apply(s: GameState, p: number, m: Move): Result {
       if (P.nerts.length) return { ok: false, why: 'nerts not empty' };
       P.calledNerts = true; s.over = true; s.caller = p; s.seq++;
       return { ok: true, roundOver: true };
+    }
+    case 'ROTATE': {
+      for (const Q of s.players) { if (Q.stock.length === 0) { Q.stock = Q.waste.reverse(); Q.waste = []; } if (Q.stock.length) Q.stock.unshift(Q.stock.pop()!); }
+      break;
     }
     case 'CHALLENGE': {
       if (!house) return { ok: false, why: 'no house rules' };
@@ -176,3 +180,9 @@ export function roundScores(s: GameState): number[] {
 
 export const isStuck = (s: GameState, p: number) => legalMoves(s, p).every(m => m.k === 'FLIP');
 export const playerSummary = (P: PlayerState) => `${P.name}: nerts=${P.nerts.length} stock=${P.stock.length} waste=${P.waste.length}`;
+
+/** circular table distance between seat i and ring position `at`, normalised to [0,1]. */
+export function ringDist(i: number, at: number, n: number): number {
+  if (n < 2) return 0;
+  const d = Math.abs(((i - at) % n + n) % n); return Math.min(d, n - d) / (n / 2);
+}

@@ -14,6 +14,8 @@ interface RoomSeat extends Seat { conn?: Conn }
 
 class Room {
   seats: RoomSeat[] = [];
+  spectators = new Set<Conn>();
+  autoloop = false;
   host = 0;
   driver: Driver | null = null;
   stopBots: (() => void) | null = null;
@@ -24,7 +26,7 @@ class Room {
   constructor(code: string) { this.code = code; }
 
   send(c: Conn | undefined, m: ServerMsg) { if (c && c.ws.readyState === c.ws.OPEN) c.ws.send(JSON.stringify(m)); }
-  broadcast(f: (seat: number) => ServerMsg | null) { this.seats.forEach((s, i) => { const m = f(i); if (m) this.send(s.conn, m); }); }
+  broadcast(f: (seat: number) => ServerMsg | null) { this.seats.forEach((s, i) => { const m = f(i); if (m) this.send(s.conn, m); }); const sm = f(-1); if (sm) for (const c of this.spectators) this.send(c, sm); }
   lobby() { const seats: SeatInfo[] = this.seats.map(s => ({ name: s.name, bot: !!s.bot, preset: s.bot?.name, connected: !!s.conn || !!s.bot })); this.broadcast(() => ({ t: 'lobby', seats, host: this.host })); }
   pushState() { const d = this.driver; if (!d) return; this.broadcast(i => ({ t: 'state', s: redact(d.state, i), now: d.now })); }
 
@@ -41,6 +43,7 @@ class Room {
       this.pushState();
       this.broadcast(() => ({ t: 'round', roundScores: sc, totals: this.totals, caller: d.state.caller, gameOver }));
       if (gameOver) { this.round = 0; this.totals = []; } else this.round++;
+      if (this.autoloop) setTimeout(() => { if (this.driver === d) this.start(this.rules); }, 8000);
     };
     d.onEvent = e => this.broadcast(() => ({ t: 'event', e }));
     this.pushState();
@@ -79,6 +82,7 @@ wss.on('connection', ws => {
       const code = (m.room || 'lobby').toLowerCase();
       let room = rooms.get(code); if (!room) { room = new Room(code); rooms.set(code, room); }
       // reconnect to an existing human seat by name, else new seat
+      if (m.spectate) { conn = { ws, room, seat: -1 }; room.spectators.add(conn); room.send(conn, { t: 'hello', you: -1, room: code }); room.lobby(); room.pushState(); return; }
       let seat = room.seats.findIndex(s => !s.bot && s.name === m.name);
       if (seat < 0) { if (room.seats.length >= MAX_SEATS) return ws.send(JSON.stringify({ t: 'error', msg: 'room full' })); room.seats.push({ id: `h${Date.now()}`, name: m.name || `p${room.seats.length}` }); seat = room.seats.length - 1; }
       conn = { ws, room, seat }; room.seats[seat].conn = conn;
@@ -88,6 +92,14 @@ wss.on('connection', ws => {
     }
     if (conn) conn.room.handle(conn, m);
   });
-  ws.on('close', () => { if (conn) { conn.room.seats[conn.seat].conn = undefined; conn.room.lobby(); } });
+  ws.on('close', () => { if (conn) { if (conn.seat < 0) conn.room.spectators.delete(conn); else { conn.room.seats[conn.seat].conn = undefined; conn.room.lobby(); } } });
 });
 console.log(`sprat server ws://0.0.0.0:${PORT}`);
+// AUTOSTART=steady,twitchy,grandma ROOM=demo HOUSE=1 → a room of bots that plays rounds forever (spectate with ?ws=...&room=demo&spectate=1)
+if (process.env.AUTOSTART) {
+  const room = new Room(process.env.ROOM ?? 'demo'); rooms.set(room.code, room);
+  for (const nm of process.env.AUTOSTART.split(',')) { const p = profile(nm); room.seats.push({ id: `bot${room.seats.length}`, name: `${p.name}${room.seats.filter(s => s.bot?.name === p.name).length || ''}`, bot: p }); }
+  room.host = -1; room.autoloop = true;
+  room.start({ houseRules: process.env.HOUSE === '1' });
+  console.log(`autostart room '${room.code}': ${room.seats.map(s => s.name).join(', ')}`);
+}

@@ -56,7 +56,7 @@ table{border-collapse:collapse;width:100%}th,td{padding:1px 5px;white-space:nowr
 th{color:var(--dim);font-weight:400}td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
 tr:nth-child(even){background:#ffffff08}
 #log{color:var(--dim);max-height:9em;overflow:auto;white-space:pre}
-.ev-beaten{color:var(--bad)}.ev-move{color:var(--fg)}.ev-cheat{color:var(--warn)}.ev-nerts{color:var(--ok);font-weight:700}.ev-fixate{color:#79c0ff}.ev-stale{color:var(--warn)}.ev-reject{color:var(--dim)}.ev-tilt{color:var(--dim)}.ev-challenge{color:var(--warn)}.ev-notice{color:#444}
+.ev-beaten{color:var(--bad)}.ev-move{color:var(--fg)}.ev-cheat{color:var(--warn)}.ev-nerts{color:var(--ok);font-weight:700}.ev-fixate{color:#79c0ff}.ev-stale{color:var(--warn)}.ev-reject{color:var(--dim)}.ev-tilt{color:var(--dim)}.ev-challenge{color:var(--warn)}.ev-notice{color:#444}.ev-rotate{color:var(--warn);font-weight:700}
 /* overlays */
 .ov{position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;z-index:50}
 .ov .box{background:#0d1117;border:1px solid #30363d;padding:8px 12px;min-width:260px;max-width:95vw}
