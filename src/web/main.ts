@@ -81,20 +81,20 @@ function render() {
 
   const opps = `<section id="opps">${v.players.map((p, i) => i === me ? '' : `<div class="opp"><span class="nm" style="color:${deckColor(i)}">${esc(p.name)}</span>
       ${p.nerts.length ? cardHtml(p.nerts.at(-1)!, '', '', `<span class="cnt">${p.nertsCount}</span>`) : emptyHtml(p.calledNerts ? 'N!' : '0')}
-      <span class="piles">${p.work.map(w => w.length ? `<div class="fan">${w.slice(-3).map((c, j) => cardHtml(c, '', `style="--dc:${deckColor(i)};top:${j * 7}px;z-index:${j}"`)).join('')}${w.length > 1 ? `<span class="cnt" style="position:absolute;right:-2px;top:-6px;font-size:9px;background:#0b0e11;padding:0 2px">${w.length}</span>` : ''}</div>` : emptyHtml('')).join('')}</span>
+      <span class="piles">${p.work.map(w => w.length ? `<div class="fan">${w.slice(-3).map((c, j) => cardHtml(c, '', `style="--dc:${deckColor(i)};--i:${j};top:${j * 7}px;z-index:${j}"`)).join('')}${w.length > 1 ? `<span class="cnt" style="position:absolute;right:-2px;top:-6px;font-size:9px;background:#0b0e11;padding:0 2px">${w.length}</span>` : ''}</div>` : emptyHtml('')).join('')}</span>
       <span class="dim">│</span>${p.waste.length ? cardHtml(p.waste.at(-1)!) : emptyHtml('')}<span class="n dim">${p.stockCount}</span>
     </div>`).join('')}</section>`;
 
   const nertsTop = P.nerts.at(-1);
-  const myWork = P.work.map((w, i) => `<div class="fanv" data-w="${i}" style="height:${Math.max(1, w.length) * 18 + 32}px">
-      ${w.length === 0 ? emptyHtml('', hotW(i) ? 'hot' : '', `data-w="${i}"`) : w.map((c, j) => cardHtml(c, `${sel?.src === 'W' && sel.w === i && j >= w.length - sel.n ? 'sel' : ''} ${j === w.length - 1 && hotW(i) ? 'hot' : ''}`, `data-w="${i}" data-j="${j}" style="--dc:${deckColor(me)};top:${j * 18}px;z-index:${j}"`)).join('')}
+  const myWork = P.work.map((w, i) => `<div class="fanv" data-w="${i}" style="height:calc(${Math.max(1, w.length) - 1} * var(--fy, 18px) + var(--ch))">
+      ${w.length === 0 ? emptyHtml('', hotW(i) ? 'hot' : '', `data-w="${i}"`) : w.map((c, j) => cardHtml(c, `${sel?.src === 'W' && sel.w === i && j >= w.length - sel.n ? 'sel' : ''} ${j === w.length - 1 && hotW(i) ? 'hot' : ''}`, `data-w="${i}" data-j="${j}" style="--dc:${deckColor(me)};--i:${j};top:${j * 18}px;z-index:${j}"`)).join('')}
     </div>`).join('');
   const waste = P.waste.slice(-3);
   const meSec = `<section id="me">
     <div class="col"><span class="lbl">sprat ${P.nertsCount}</span><div class="pile">${nertsTop !== undefined ? cardHtml(nertsTop, sel?.src === 'N' ? 'sel' : '', 'data-src="N"', `<span class="cnt">${P.nertsCount}</span>`) : emptyHtml(P.calledNerts ? 'called' : 'empty', '', '')}</div>
       ${P.nertsCount === 0 && !P.calledNerts && !v.over ? '<button data-a="nerts" class="ok" style="font-weight:700">SPRAT!</button>' : ''}</div>
     <div id="work">${myWork}</div>
-    <div class="col"><span class="lbl">river</span><div class="fanh">${waste.length ? waste.map((c, j) => cardHtml(c, j === waste.length - 1 && sel?.src === 'S' ? 'sel' : '', j === waste.length - 1 ? 'data-src="S"' : '', `<span class="cnt" style="display:none"></span>`).replace('class="c', `style="left:${j * 10}px;z-index:${j}" class="c`)).join('') : emptyHtml('')}</div><span class="n dim">${P.wasteCount}</span></div>
+    <div class="col"><span class="lbl">river</span><div class="fanh">${waste.length ? waste.map((c, j) => cardHtml(c, j === waste.length - 1 && sel?.src === 'S' ? 'sel' : '', j === waste.length - 1 ? 'data-src="S"' : '', `<span class="cnt" style="display:none"></span>`).replace('class="c', `style="--i:${j};left:${j * 10}px;z-index:${j}" class="c`)).join('') : emptyHtml('')}</div><span class="n dim">${P.wasteCount}</span></div>
     <div class="col"><span class="lbl">stock</span><div class="pile">${P.stockCount ? backHtml(me, '', 'data-a="flip"', `<span class="cnt">${P.stockCount}</span>`) : emptyHtml('↻', '', 'data-a="flip"')}</div>
       ${v.rules.houseRules ? `<div class="stockbtns"><button data-a="flipn" data-n="2">2</button><button data-a="flipn" data-n="4">4</button></div>` : ''}</div>
   </section>`;
