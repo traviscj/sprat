@@ -11,7 +11,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "sim": "node --experimental-strip-types src/sim/cli.ts",
-    "server": "node --experimental-strip-types src/server/server.ts"
+    "server": "node --experimental-strip-types src/server/server.ts",
+    "server:dev": "node --watch --experimental-strip-types src/server/server.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.2",
